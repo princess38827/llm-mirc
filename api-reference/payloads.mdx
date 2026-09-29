@@ -1,7 +1,7 @@
 ---
-title: "REST API Endpoints for Payloads"
+title: "VOLLEY OSA REST API — Payload Management Endpoints"
 sidebarTitle: "Payloads"
-description: "Reference for VOLLEY OSA payload management endpoints — register, list, retrieve, and deregister payload modules via the REST API."
+description: "Reference for VOLLEY OSA payload endpoints — register, list, retrieve, and deregister non-kinetic payload modules via the REST API."
 ---
 
 Payloads are the core resource of the VOLLEY OSA platform. Each payload represents a non-kinetic module — a sensor, emitter, data collector, or other capability unit — registered with and managed by VOLLEY. The endpoints documented here let you list all registered payloads, register new ones, retrieve individual payload records, and deregister payloads that are no longer in use. For sending commands to a payload or checking its live operational status, see [Commands](/api-reference/commands) and [Status](/api-reference/status).
@@ -14,7 +14,7 @@ List all payloads currently registered with your VOLLEY OSA account. Results are
 
 **Endpoint**
 
-```
+```http
 GET https://api.volleyosa.dev/v1/payloads
 ```
 
@@ -128,7 +128,7 @@ Register a new payload with the VOLLEY OSA platform. A successful registration r
 
 **Endpoint**
 
-```
+```http
 POST https://api.volleyosa.dev/v1/payloads
 ```
 
@@ -206,7 +206,7 @@ Retrieve the full record for a single registered payload by its unique identifie
 
 **Endpoint**
 
-```
+```http
 GET https://api.volleyosa.dev/v1/payloads/{id}
 ```
 
@@ -253,7 +253,7 @@ Deregister a payload, permanently removing it from the VOLLEY OSA platform. This
 
 **Endpoint**
 
-```
+```http
 DELETE https://api.volleyosa.dev/v1/payloads/{id}
 ```
 

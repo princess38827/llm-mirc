@@ -16,7 +16,7 @@ When you register a payload via `POST /payloads`, VOLLEY assigns it a unique `id
 
 A payload moves through four well-defined states. You can read the current state from the `status` field returned by `GET /payloads/{id}` and `GET /payloads/{id}/status`.
 
-```
+```text
 registered → active → inactive → deregistered
 ```
 
@@ -135,7 +135,7 @@ Subscribe to `payload.events` to build reactive integrations that respond to sta
 
 All VOLLEY OSA REST endpoints are prefixed with an API version segment. The current version is `/v1`:
 
-```
+```text
 https://api.volleyosa.dev/v1/payloads
 ```
 

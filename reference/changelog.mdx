@@ -1,7 +1,7 @@
 ---
-title: "VOLLEY OSA Changelog"
+title: "VOLLEY OSA ICD Changelog — Interface Version History"
 sidebarTitle: "Changelog"
-description: "Release history for VOLLEY OSA — interface changes, additions, and deprecations across all versions of the ICD."
+description: "Version-by-version release history for the VOLLEY OSA ICD — REST endpoint additions, AsyncAPI channel updates, and deprecation notices."
 ---
 
 This page tracks interface changes, additions, and deprecations across all versions of the VOLLEY OSA ICD. Each entry describes what changed, what was added, and — where applicable — what was deprecated or removed. Consult this page whenever you upgrade your integration to understand what may have shifted between versions.
@@ -17,6 +17,7 @@ The following interfaces and capabilities were introduced in the initial concept
 - **REST API:** `GET /payloads/{id}` — retrieve the full record for a single payload by identifier
 - **REST API:** `POST /payloads/{id}/commands` — dispatch a command to a registered payload
 - **REST API:** `GET /payloads/{id}/status` — poll the current operational status of a payload
+- **REST API:** `DELETE /payloads/{id}` — deregister a payload and remove it from the VOLLEY platform
 - **AsyncAPI:** `payload.telemetry` channel — subscribe to continuous sensor and telemetry data streams from a payload
 - **AsyncAPI:** `payload.events` channel — subscribe to discrete lifecycle and state-change notifications emitted by a payload
 - **Authentication:** API key Bearer token scheme — all requests must include a valid `Authorization: Bearer <api-key>` header

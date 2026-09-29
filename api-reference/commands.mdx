@@ -1,7 +1,7 @@
 ---
-title: "REST API Endpoints for Payload Commands"
+title: "VOLLEY OSA REST API — Dispatch Commands to Payloads"
 sidebarTitle: "Commands"
-description: "Reference for POST /payloads/{id}/commands — dispatch commands to a registered VOLLEY OSA payload and track execution."
+description: "Reference for POST /payloads/{id}/commands — send typed commands with priority to a registered VOLLEY OSA payload and track async execution."
 ---
 
 Commands are the mechanism through which you instruct a registered VOLLEY OSA payload to take action — starting a capture sequence, adjusting operational parameters, entering standby, or any other behavior the payload declares as a capability. When you send a command, the API accepts it synchronously and returns a command record immediately. Execution then happens asynchronously on the payload itself, allowing your application to remain responsive while the payload processes the instruction. Use the returned `command_id` to correlate events from the payload's events channel as execution progresses.
@@ -14,7 +14,7 @@ Dispatch a command to a specific registered payload. The API validates the reque
 
 **Endpoint**
 
-```
+```http
 POST https://api.volleyosa.dev/v1/payloads/{id}/commands
 ```
 

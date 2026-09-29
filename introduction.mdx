@@ -1,5 +1,5 @@
 ---
-title: "VOLLEY OSA: Modular Payload Integration for the VOLLEY Platform"
+title: "VOLLEY OSA: Non-Kinetic Payload Integration Overview"
 sidebarTitle: "Introduction"
 description: "VOLLEY OSA is an open-systems interface standard for integrating non-kinetic payload modules into the VOLLEY platform using REST and async APIs."
 ---
@@ -57,6 +57,7 @@ VOLLEY OSA defines two complementary interface types that together cover both re
   - `GET /payloads/{id}` — retrieve a specific payload record
   - `POST /payloads/{id}/commands` — dispatch a command to a payload
   - `GET /payloads/{id}/status` — read the current status of a payload
+  - `DELETE /payloads/{id}` — deregister a payload from the platform
 
 - **AsyncAPI** — An event-driven, publish/subscribe interface for high-frequency and asynchronous data flows. Payloads publish to two channels:
   - `payload.telemetry` — continuous sensor and operational data streams

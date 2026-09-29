@@ -1,7 +1,7 @@
 ---
-title: "REST API Authentication — Bearer Token"
+title: "VOLLEY OSA REST API — API Key Bearer Authentication"
 sidebarTitle: "Authentication"
-description: "How to pass your VOLLEY OSA API key as a Bearer token to authenticate REST API requests."
+description: "Authenticate every VOLLEY OSA REST API request by passing your API key as a Bearer token in the Authorization header, with curl, Python, and JS examples."
 ---
 
 Every request you make to the VOLLEY OSA REST API must be authenticated. The API uses API key authentication: you include your secret key as a Bearer token in the `Authorization` header of each HTTP request. There are no sessions, cookies, or OAuth flows — authentication is stateless and header-based, making it straightforward to use from any HTTP client, scripting environment, or server-side application.

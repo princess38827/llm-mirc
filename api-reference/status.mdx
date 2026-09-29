@@ -1,7 +1,7 @@
 ---
-title: "REST API Endpoint for Payload Status"
+title: "VOLLEY OSA REST API — Live Payload Status Endpoint"
 sidebarTitle: "Status"
-description: "Reference for GET /payloads/{id}/status — retrieve the current operational status and health of a registered VOLLEY OSA payload."
+description: "Reference for GET /payloads/{id}/status — retrieve the current lifecycle status, uptime, and health metrics for a registered VOLLEY OSA payload."
 ---
 
 The status endpoint gives you a real-time snapshot of a payload's operational condition: whether it is online, how long it has been running, and detailed health metrics such as CPU load, memory pressure, and accumulated error count. This is the right endpoint to call when you need an immediate, point-in-time picture of a payload's health — for example, before dispatching a high-priority command or when triaging an alert. For continuous, event-driven monitoring, consider subscribing to the `payload.events` AsyncAPI channel instead of polling this endpoint repeatedly.
@@ -14,7 +14,7 @@ Retrieve the current operational status and health metrics for a single register
 
 **Endpoint**
 
-```
+```http
 GET https://api.volleyosa.dev/v1/payloads/{id}/status
 ```
 

@@ -1,7 +1,7 @@
 ---
-title: "Send Commands to a Payload"
+title: "Command Dispatch for VOLLEY OSA Registered Payloads"
 sidebarTitle: "Send Commands"
-description: "How to dispatch commands to a registered VOLLEY OSA payload using POST /payloads/{id}/commands and interpret the response."
+description: "Use POST /payloads/{id}/commands to send typed, prioritised commands to a VOLLEY OSA payload and track asynchronous execution outcomes on payload.events."
 ---
 
 Commands are the primary control mechanism for registered payloads in VOLLEY OSA. When you send a command, the platform synchronously acknowledges receipt and acceptance, then asynchronously routes the instruction to the target payload for execution. This separation of acknowledgment from execution lets your integration remain responsive while the payload performs potentially long-running operations. This guide covers how to construct and dispatch commands, interpret the acknowledgment, and monitor execution outcomes.

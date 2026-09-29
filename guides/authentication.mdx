@@ -1,7 +1,7 @@
 ---
-title: "Authenticate with VOLLEY OSA"
+title: "Authenticating REST and AsyncAPI Calls in VOLLEY OSA"
 sidebarTitle: "Authentication"
-description: "Learn how to obtain and use VOLLEY OSA API keys to authenticate all REST and AsyncAPI requests to the platform."
+description: "Learn how to obtain a VOLLEY OSA API key, include it as a Bearer token on every REST and AsyncAPI request, and handle common authentication errors."
 ---
 
 VOLLEY OSA secures every request — REST and AsyncAPI alike — using API key authentication via Bearer tokens. Every call you make to the platform must include a valid API key in the `Authorization` header; requests without a key, or with an invalid one, are rejected before they reach any endpoint logic.

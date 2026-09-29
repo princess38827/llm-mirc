@@ -1,7 +1,7 @@
 ---
-title: "Get Started with VOLLEY OSA in 5 Minutes"
+title: "VOLLEY OSA Quickstart: Integrate a Payload in Minutes"
 sidebarTitle: "Quickstart"
-description: "Learn how to authenticate, register a payload, and send your first command using the VOLLEY OSA REST API in under five minutes."
+description: "Authenticate, register a payload, send a command, and check status using the VOLLEY OSA REST API — your first integration in five minutes."
 ---
 
 This guide walks you through the minimum steps required to integrate a payload with the VOLLEY platform using the VOLLEY OSA REST API. By the end, you will have a registered payload, a sent command, a status response, and a clear path to subscribing to async event streams — all in under five minutes.
@@ -118,7 +118,7 @@ This guide walks you through the minimum steps required to integrate a payload w
     - **`payload.telemetry`** — a continuous stream of sensor readings and operational metrics emitted by active payloads.
     - **`payload.events`** — discrete notifications for lifecycle transitions and state changes (for example, when a payload moves from `registered` to `active`).
 
-    Connecting to these channels requires an AsyncAPI-compatible client. Refer to the [Async API reference](/async-api) for full channel schemas, connection details, and code examples.
+    Connecting to these channels requires an AsyncAPI-compatible client. Refer to the [Async API reference](/async-api/overview) for full channel schemas, connection details, and code examples.
 
     <Note>
       Async channel subscriptions use the same API key for authentication. Pass it as a Bearer token during the WebSocket or broker handshake as described in the Async API reference.

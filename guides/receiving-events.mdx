@@ -1,7 +1,7 @@
 ---
-title: "Receive Payload Events and Telemetry"
+title: "Receiving Payload Events and Telemetry in VOLLEY OSA"
 sidebarTitle: "Receive Events"
-description: "How to subscribe to VOLLEY OSA AsyncAPI channels to receive real-time payload events and continuous telemetry data streams."
+description: "Subscribe to VOLLEY OSA AsyncAPI channels over WebSocket or AMQP to receive real-time payload lifecycle events and continuous telemetry sensor data."
 ---
 
 VOLLEY OSA uses AsyncAPI channels to push real-time data to your integration without requiring you to poll the REST API. Two channels are available: `payload.events`, which delivers discrete lifecycle and state-change notifications, and `payload.telemetry`, which carries a continuous stream of sensor readings from active payloads. Understanding both channels and how to subscribe to them is essential for building integrations that react to payload behavior in real time.

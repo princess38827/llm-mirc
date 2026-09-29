@@ -1,7 +1,7 @@
 ---
-title: "Payload Data Model and Lifecycle"
+title: "VOLLEY OSA Payload Data Model, Types, and Lifecycle"
 sidebarTitle: "Payload Model"
-description: "The VOLLEY OSA payload object — its fields, supported types, and lifecycle states from registration through deregistration."
+description: "The VOLLEY OSA payload object — its fields, supported types, lifecycle states, and capabilities array, from registration through deregistration."
 ---
 
 In VOLLEY OSA, a **payload** is the platform's representation of a connected non-kinetic module — an EO sensor, RF emitter, cyber tool, or any other conformant device. Every payload you register with the platform is persisted as a payload object: a structured record that captures the module's identity, declared capabilities, and current lifecycle state. Understanding this object is fundamental to working with the REST API, because nearly every endpoint either creates, reads, updates, or transitions a payload object.
@@ -74,7 +74,7 @@ The `type` field must be one of the following platform-recognized values:
 
 Every payload moves through a defined set of states from the moment it is registered until it is removed from the platform. Understanding these transitions helps you anticipate which operations are valid at each stage and what events to expect on the `payload.events` async channel.
 
-```
+```text
 registered → active → inactive → deregistered
                 ↑__________|
 ```
