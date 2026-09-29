@@ -1,0 +1,111 @@
+---
+title: "VOLLEY OSA Frequently Asked Questions"
+sidebarTitle: "FAQ"
+description: "Answers to common questions about integrating with VOLLEY OSA — authentication, payload types, API limits, and troubleshooting."
+---
+
+This page answers common questions about integrating with VOLLEY OSA. Whether you are setting up authentication for the first time, choosing between transport protocols for the AsyncAPI channels, or troubleshooting an unexpected status transition, you will find concise guidance below. If your question is not covered here, contact your VOLLEY platform administrator or open a support request through your program office.
+
+---
+
+<Accordion title="What is VOLLEY OSA?">
+  VOLLEY OSA (Open Systems Architecture) is a versioned interface specification — comprising both REST and AsyncAPI surfaces — that lets you integrate non-kinetic payloads into the VOLLEY platform without coupling to any single vendor implementation. You register your payload through the REST API, issue commands to it, poll or stream its status, and receive continuous telemetry and discrete event notifications over the AsyncAPI channels. The interface is designed to be MOSA-aligned, meaning it enforces clean separation between the payload integration layer and the broader platform so that payloads can be swapped, upgraded, or extended without rewriting the surrounding system.
+</Accordion>
+
+<Accordion title="Is the API production-ready?">
+  Not yet. VOLLEY OSA v0.1 is a **concept-seed release** intended for early integration prototyping and architecture validation. It has not undergone formal MOSA certification, and the interface — including endpoint signatures, field names, authentication scheme, and channel topics — is subject to change, including breaking changes, before a certified baseline is established. You should treat v0.1 as a working draft. Do not use it as the basis for a program-of-record integration without explicit coordination with the VOLLEY platform team, and monitor the [Changelog](/reference/changelog) for updates as the specification matures.
+</Accordion>
+
+<Accordion title="How do I get an API key?">
+  API keys are issued and managed by your **VOLLEY platform administrator**. Contact them to request a key scoped to your integration. When you receive your key, include it in every request using the `Authorization` header:
+
+  ```http
+  Authorization: Bearer <your-api-key>
+  ```
+
+  If you lose your key, have it rotated, or believe it has been compromised, notify your platform administrator immediately so they can revoke the existing key and issue a replacement. Do not embed API keys in source code repositories or transmit them over unencrypted channels.
+</Accordion>
+
+<Accordion title="What payload types are supported?">
+  When you register a payload via `POST /payloads`, you must declare its type using one of the following classifications:
+
+  | Type | Description |
+  |------|-------------|
+  | `electro-optical` | Camera, imaging, or optical sensor payloads |
+  | `rf` | Radio-frequency payloads including jamming, sensing, or communications |
+  | `cyber` | Cyber-effects or electronic-warfare payloads |
+  | `acoustic` | Acoustic sensor or emission payloads |
+  | `other` | Any payload type not covered by the above categories |
+
+  The `other` type is available for novel or classified payload classes that do not fit an existing category. Additional types may be introduced in future minor versions of the specification.
+</Accordion>
+
+<Accordion title="What is the difference between telemetry and events?">
+  The two AsyncAPI channels serve distinct purposes:
+
+  - **`payload.telemetry`** carries **continuous, high-frequency sensor data** — think attitude, position, battery level, thermal readings, or any other metric your payload streams at a regular interval. You should subscribe to this channel when you need a real-time data feed for monitoring dashboards, recording, or closed-loop control.
+
+  - **`payload.events`** carries **discrete lifecycle and state-change notifications** — things like `registered`, `online`, `offline`, `command_received`, `command_executed`, `status_changed`, or `error`. Events are sparse and asynchronous; they fire when something meaningful changes about the payload's state, not on a fixed cadence.
+
+  In practice, you will likely subscribe to both: telemetry for situational awareness and data capture, events for driving workflow logic and alerting.
+</Accordion>
+
+<Accordion title="Can I register multiple payloads with the same API key?">
+  Yes. A single API key can be used to register and manage **multiple payloads**. Each payload you register via `POST /payloads` receives a unique `id`, and all subsequent REST calls (`GET /payloads/{id}`, `POST /payloads/{id}/commands`, `GET /payloads/{id}/status`) and AsyncAPI subscriptions are scoped to that individual payload identifier. Your API key acts as the credential for the integration account as a whole, not for any single payload. If you need to segment access — for example, to ensure that one operator cannot issue commands to another operator's payloads — request separate API keys for each access boundary from your platform administrator.
+</Accordion>
+
+<Accordion title="What happens if my payload goes offline?">
+  If the VOLLEY platform loses contact with a registered payload (for example, due to a network interruption, power loss, or deliberate shutdown), the following occurs:
+
+  1. The payload's operational status transitions to **`inactive`**.
+  2. The `payload.events` channel emits a **`status_changed`** event carrying the previous status, the new `inactive` status, and a UTC timestamp.
+  3. Subsequent calls to `GET /payloads/{id}/status` will reflect the `inactive` state until the payload reconnects and re-establishes its heartbeat.
+
+  Your integration should subscribe to `payload.events` and handle `status_changed` events gracefully — for example, by alerting an operator, suspending dependent workflows, or attempting reconnection if your payload supports it.
+
+  <Note>
+    The exact timeout threshold before a payload is marked `inactive` is configurable at the platform level. Check with your VOLLEY platform administrator for the heartbeat timeout value in your deployment.
+  </Note>
+</Accordion>
+
+<Accordion title="How do I handle 429 rate-limiting errors?">
+  A `429 Too Many Requests` response means you have exceeded the request rate allowed for your API key. To recover:
+
+  1. **Stop retrying immediately.** Do not hammer the API after receiving a 429 — doing so will extend your back-off window.
+  2. **Read the `Retry-After` header.** The response will include a `Retry-After` header specifying the number of seconds you must wait before making another request.
+  3. **Implement exponential backoff.** For repeated 429 responses, double your wait interval on each retry (e.g., 1 s → 2 s → 4 s → 8 s) up to a reasonable maximum, with added jitter to avoid thundering-herd conditions.
+
+  ```
+  Retry-After: 30
+  ```
+
+  If you are consistently hitting rate limits, consider batching requests, reducing polling frequency on `GET /payloads/{id}/status` in favour of the `payload.events` AsyncAPI channel, or requesting a higher rate-limit tier from your platform administrator.
+</Accordion>
+
+<Accordion title="Are WebSocket and AMQP both supported for AsyncAPI?">
+  Yes. The VOLLEY OSA AsyncAPI specification supports **both WebSocket and AMQP** as transport bindings for the `payload.telemetry` and `payload.events` channels. Your choice of transport depends on your integration environment:
+
+  - **WebSocket** is well-suited for browser-based dashboards, lightweight edge clients, or environments where opening a persistent TCP connection through a firewall is straightforward.
+  - **AMQP** is better suited for server-side integrations, message-queuing architectures, or scenarios where you need durable subscriptions, message acknowledgement, or fan-out to multiple consumers.
+
+  Both transports require the same API key Bearer token for authentication. Refer to the AsyncAPI channel definitions in the interface specification for the exact binding parameters for each transport.
+</Accordion>
+
+<Accordion title="How do I deregister a payload?">
+  To remove a payload from the VOLLEY platform, send a `DELETE` request to the payload's resource endpoint:
+
+  ```http
+  DELETE /payloads/{id}
+  Authorization: Bearer <your-api-key>
+  ```
+
+  A successful deregistration returns a `204 No Content` response. After deregistration:
+
+  - The payload record is removed and will no longer appear in `GET /payloads` responses.
+  - Any active AsyncAPI subscriptions for the payload's `payload.telemetry` or `payload.events` channels will be terminated.
+  - The payload `id` cannot be reused; if you re-register the same physical payload, it will receive a new identifier.
+
+  <Note>
+    Deregistration is irreversible. Ensure you have archived any telemetry or event history you need to retain before issuing a `DELETE` request, as platform-side data retention policies may purge the associated records shortly after deregistration.
+  </Note>
+</Accordion>

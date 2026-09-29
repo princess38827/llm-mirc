@@ -1,0 +1,34 @@
+---
+title: "Open Systems Architecture and MOSA Alignment"
+sidebarTitle: "Open Systems"
+description: "How VOLLEY OSA implements Modular Open Systems Approach (MOSA) principles to enable interchangeable, vendor-neutral payload integration."
+---
+
+VOLLEY OSA is designed from the ground up around open systems principles. Rather than locking payload vendors into proprietary integration paths, the architecture defines a stable, publicly documented interface contract that any conformant module can implement. This approach draws directly from the DoD's Modular Open Systems Approach (MOSA) guidance and is intended to foster a competitive, multi-vendor payload ecosystem around the VOLLEY platform.
+
+## What Is MOSA?
+
+MOSA — Modular Open Systems Approach — is a DoD-mandated design philosophy that requires defense systems to be built using open standards, well-defined module boundaries, and interfaces that enable competitive replacement of components over the system's lifecycle. Rather than embedding proprietary protocols at integration points, MOSA-aligned systems publish their interfaces so that any vendor meeting the published standard can supply a conformant module. The goal is to reduce vendor lock-in, lower total lifecycle cost, and accelerate the insertion of new technology as it matures.
+
+## OSA Principles in VOLLEY
+
+VOLLEY OSA translates MOSA guidance into concrete design decisions at every layer of the integration boundary:
+
+- **Common interface contract.** All payload modules integrate through the same OpenAPI and AsyncAPI specifications, regardless of payload type or vendor. There is no separate "fast path" or proprietary handshake for preferred vendors.
+- **Payload-agnostic API design.** The REST and async interfaces are deliberately type-neutral. The `type` and `capabilities` fields in the payload object carry domain semantics, but the transport, authentication, and lifecycle mechanics are identical for an EO sensor, an RF emitter, and a cyber tool.
+- **Versioned ICD.** The interface contract is formally versioned (currently v0.1). Breaking changes require a version increment, giving integrators a stable target and a clear signal when re-validation is needed.
+- **Interoperability by default.** Because all payloads speak the same interface, platform-level features — discovery, status aggregation, command routing — work uniformly across payload types without per-vendor customization.
+
+## Benefits for Integrators
+
+For payload developers, MOSA alignment means you write your integration once, to the ICD, and it works with any VOLLEY platform deployment. You do not need to obtain or maintain a proprietary SDK, negotiate a bilateral integration agreement, or track changes in a vendor-internal codebase. When the ICD is updated, the published changelog tells you exactly which endpoints or schemas changed and what action (if any) is required on your side. This dramatically reduces the cost of initial integration and ongoing maintenance across platform upgrades.
+
+## Interface Contract
+
+The OpenAPI specification and the AsyncAPI specification together constitute the complete, normative interface contract for VOLLEY OSA. Payload modules must produce and consume messages that conform to the schemas defined in those documents. Prose descriptions in this documentation are informative — the machine-readable specs are authoritative. If you observe any discrepancy between this documentation and the published specs, treat the specs as correct and file a documentation issue.
+
+Both specs are versioned alongside the ICD. The current release is **v0.1**. All schemas include explicit required fields and enum constraints, so your implementation can be validated against the spec programmatically before deployment.
+
+<Tip>
+  Pin your integration to the specific ICD version you tested against (e.g., `v0.1`) and treat a version increment as a trigger for re-validation. Refer to the ICD changelog before upgrading to understand which changes are additive versus breaking.
+</Tip>

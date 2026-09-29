@@ -1,47 +1,127 @@
 ---
-title: "Quickstart"
-description: "Begin with a guide on the fastest path to a successful outcome"
+title: "Get Started with VOLLEY OSA in 5 Minutes"
+sidebarTitle: "Quickstart"
+description: "Learn how to authenticate, register a payload, and send your first command using the VOLLEY OSA REST API in under five minutes."
 ---
 
-Describe how someone begins using your product. What is the first thing they need to do? Are there any prerequisites?
-
-A quickstart should take someone from zero to using your product. They'll get a quick win and a sense of what they can accomplish.
-
-## Prerequisites
-
-Before you begin, you must have:
-
-- Requirement one (for example, Node.js 18+, a free account, an API key)
-- Requirement two (for example, a compatible device, a compatible browser, a compatible operating system)
-
-## Get started
-
-<Steps>
-  <Step title="Install">
-    Describe how to install your product or sign up.
-
-    ```bash
-    npm install your-package
-    ```
-  </Step>
-  <Step title="Configure">
-    Describe any setup or configuration needed before first use.
-
-    ```bash
-    your-cli init
-    ```
-  </Step>
-  <Step title="Run it">
-    Show the first thing a user does to see it working.
-
-    ```bash
-    your-cli start
-    ```
-  </Step>
-</Steps>
+This guide walks you through the minimum steps required to integrate a payload with the VOLLEY platform using the VOLLEY OSA REST API. By the end, you will have a registered payload, a sent command, a status response, and a clear path to subscribing to async event streams — all in under five minutes.
 
 <Tip>
-  Give people a way to get help. This could be a link to a support page, a chat with a customer support agent, or a forum for your product.
-
-  Example: Need help? Reach out to us at [support@yourcompany.com](mailto:support@yourcompany.com).
+  Keep your API key out of source control and environment logs. Store it in a secrets manager or environment variable and reference it at runtime. Never hard-code it in application code or commit it to a repository.
 </Tip>
+
+<Steps>
+  <Step title="Get Your API Key">
+    All VOLLEY OSA API calls require a Bearer token issued by your VOLLEY platform administrator. To obtain one:
+
+    1. Contact your VOLLEY platform administrator or use your organization's provisioning portal to request integration access.
+    2. You will receive an API key in the format `vosa_<random-string>`. This key identifies your integration and scopes its permissions to the payload resources you are authorized to manage.
+    3. Store the key securely — for example, as an environment variable named `VOSA_API_KEY`.
+
+    ```bash
+    export VOSA_API_KEY="vosa_your_key_here"
+    ```
+
+    You will pass this key as a Bearer token in the `Authorization` header of every request.
+  </Step>
+
+  <Step title="Register Your Payload">
+    Before VOLLEY can route commands to your payload, you must register it. Send a `POST` request to `/v1/payloads` with a JSON body describing the payload's identity and capabilities.
+
+    ```bash
+    # Register a payload
+    curl -X POST https://api.volleyosa.dev/v1/payloads \
+      -H "Authorization: Bearer $VOSA_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "name": "EO-Sensor-Alpha",
+        "type": "electro-optical",
+        "version": "1.0.0",
+        "capabilities": ["imaging", "tracking"]
+      }'
+    ```
+
+    A successful registration returns `201 Created` with the new payload record, including a platform-assigned `id` you will use in all subsequent requests:
+
+    ```json
+    {
+      "id": "pl_7f3a9c2b",
+      "name": "EO-Sensor-Alpha",
+      "type": "electro-optical",
+      "status": "registered",
+      "created_at": "2024-01-15T10:30:00Z"
+    }
+    ```
+
+    Save the returned `id` — in this example, `pl_7f3a9c2b` — for the steps that follow.
+  </Step>
+
+  <Step title="Send a Command">
+    With your payload registered, you can dispatch commands to it via `POST /v1/payloads/{id}/commands`. The request body contains the command type and any parameters required to execute it.
+
+    ```bash
+    # Send a command to the registered payload
+    curl -X POST https://api.volleyosa.dev/v1/payloads/pl_7f3a9c2b/commands \
+      -H "Authorization: Bearer $VOSA_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "command": "capture_image",
+        "parameters": {
+          "resolution": "high",
+          "format": "jpeg"
+        }
+      }'
+    ```
+
+    The platform acknowledges the command synchronously and returns a command record. Execution happens asynchronously on the payload side.
+
+    ```json
+    {
+      "command_id": "cmd_4d1e82fa",
+      "payload_id": "pl_7f3a9c2b",
+      "command": "capture_image",
+      "status": "acknowledged",
+      "issued_at": "2024-01-15T10:31:05Z"
+    }
+    ```
+
+    A `status` of `"acknowledged"` means VOLLEY has accepted the command and dispatched it to your payload for execution.
+  </Step>
+
+  <Step title="Check Status">
+    To read the current operational state of your payload, send a `GET` request to `/v1/payloads/{id}/status`.
+
+    ```bash
+    # Check payload status
+    curl -X GET https://api.volleyosa.dev/v1/payloads/pl_7f3a9c2b/status \
+      -H "Authorization: Bearer $VOSA_API_KEY"
+    ```
+
+    The response reflects the most recently observed state of the payload, including connectivity and health indicators:
+
+    ```json
+    {
+      "payload_id": "pl_7f3a9c2b",
+      "status": "active",
+      "last_seen": "2024-01-15T10:31:10Z",
+      "health": "nominal",
+      "active_command": "cmd_4d1e82fa"
+    }
+    ```
+
+    The `status` field will be one of `registered`, `active`, `inactive`, or `deregistered`. See [Core Concepts](/concepts) for a full description of the payload lifecycle.
+  </Step>
+
+  <Step title="Subscribe to Events">
+    Beyond polling status, VOLLEY OSA provides two AsyncAPI channels that push data to your integration in real time:
+
+    - **`payload.telemetry`** — a continuous stream of sensor readings and operational metrics emitted by active payloads.
+    - **`payload.events`** — discrete notifications for lifecycle transitions and state changes (for example, when a payload moves from `registered` to `active`).
+
+    Connecting to these channels requires an AsyncAPI-compatible client. Refer to the [Async API reference](/async-api) for full channel schemas, connection details, and code examples.
+
+    <Note>
+      Async channel subscriptions use the same API key for authentication. Pass it as a Bearer token during the WebSocket or broker handshake as described in the Async API reference.
+    </Note>
+  </Step>
+</Steps>

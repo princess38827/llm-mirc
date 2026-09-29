@@ -1,0 +1,84 @@
+---
+title: "Authenticate with VOLLEY OSA"
+sidebarTitle: "Authentication"
+description: "Learn how to obtain and use VOLLEY OSA API keys to authenticate all REST and AsyncAPI requests to the platform."
+---
+
+VOLLEY OSA secures every request — REST and AsyncAPI alike — using API key authentication via Bearer tokens. Every call you make to the platform must include a valid API key in the `Authorization` header; requests without a key, or with an invalid one, are rejected before they reach any endpoint logic.
+
+## Obtaining an API Key
+
+API keys are provisioned by your VOLLEY platform administrator or integration team. To request access, reach out to the team responsible for your VOLLEY OSA deployment and provide the following information:
+
+- The name of the integration or service that will consume the API.
+- The environment you are targeting (development, staging, or production).
+- The expected scope of access (read-only, command dispatch, full access).
+
+Once your request is approved, you will receive an API key string. Store it securely immediately — keys are only displayed once at generation time and cannot be retrieved again afterward.
+
+## Using Your API Key
+
+Include your API key as a Bearer token in the `Authorization` header of every HTTP request. The examples below show how to authenticate a basic request to list registered payloads.
+
+**cURL**
+
+```bash
+curl https://api.volleyosa.dev/v1/payloads \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+**Python**
+
+```python
+import requests
+
+headers = {"Authorization": "Bearer YOUR_API_KEY"}
+response = requests.get("https://api.volleyosa.dev/v1/payloads", headers=headers)
+```
+
+Replace `YOUR_API_KEY` with the key you received from your administrator. You can verify the key is working by checking that the response returns a `200 OK` status rather than `401 Unauthorized`.
+
+## AsyncAPI Authentication
+
+When connecting to VOLLEY OSA's AsyncAPI channels — `payload.telemetry` and `payload.events` — you authenticate with the same Bearer token, adapted to the transport protocol you are using.
+
+- **AMQP:** Pass the Bearer token as the value of the `authorization` key inside the AMQP connection properties object at connection time.
+- **WebSocket:** Pass the Bearer token either as an `Authorization` header during the WebSocket upgrade handshake, or as the `token` query parameter in the connection URL (e.g., `wss://async.volleyosa.dev/v1/payload.events?token=YOUR_API_KEY`). Prefer the header approach wherever your client library supports it.
+
+## API Key Security
+
+Treat your API key with the same care as a password. Follow these practices to reduce the risk of accidental exposure or misuse.
+
+- **Never commit keys to source control.** Even in private repositories, leaked keys in git history are a common source of credential exposure.
+- **Rotate keys regularly.** Work with your administrator to establish a key rotation schedule, and rotate immediately if you suspect a key has been compromised.
+- **Use environment variables.** Load keys at runtime from environment variables or a secrets manager rather than hard-coding them in your application source.
+- **Restrict key scope.** Request only the permission level your integration actually needs.
+- **Audit key usage.** Review access logs periodically to detect unexpected usage patterns.
+
+<Warning>
+Never expose your API key in client-side code — including browser JavaScript, mobile app binaries, or any code that is shipped to end users. Client-side code can be inspected and decompiled, making embedded keys trivially extractable. Always route authenticated requests through a server-side component you control.
+</Warning>
+
+## Authentication Errors
+
+When a request cannot be authenticated or authorized, VOLLEY OSA returns a JSON error body alongside an HTTP error status. The table below describes the most common scenarios.
+
+| HTTP Status | `code` Field | Scenario |
+|---|---|---|
+| `401 Unauthorized` | `MISSING_TOKEN` | The `Authorization` header was not included in the request. |
+| `401 Unauthorized` | `INVALID_TOKEN` | The Bearer token is malformed, expired, or has been revoked. |
+| `401 Unauthorized` | `TOKEN_EXPIRED` | The API key has passed its expiry date and must be renewed by your administrator. |
+| `403 Forbidden` | `INSUFFICIENT_SCOPE` | The key is valid but does not have permission to perform the requested operation (e.g., a read-only key attempting a command dispatch). |
+| `403 Forbidden` | `ENVIRONMENT_MISMATCH` | The key was issued for a different environment (e.g., using a staging key against the production base URL). |
+
+All error responses follow the standard VOLLEY OSA error envelope:
+
+```json
+{
+  "error": "Unauthorized",
+  "code": "INVALID_TOKEN",
+  "message": "The provided Bearer token is invalid or has been revoked."
+}
+```
+
+If you encounter a persistent `401` after confirming your key is correct, contact your VOLLEY platform administrator to verify the key has not been revoked or rotated.

@@ -1,0 +1,78 @@
+---
+title: "VOLLEY OSA AsyncAPI Overview"
+sidebarTitle: "Overview"
+description: "How VOLLEY OSA uses AsyncAPI channels over WebSocket and AMQP to deliver real-time payload events and telemetry to integrators."
+---
+
+VOLLEY OSA provides two async channels for real-time data delivery — one for discrete lifecycle events, one for continuous telemetry. Rather than polling REST endpoints, integrators connect once and receive a live stream of messages as payloads change state, complete commands, and report sensor data. Both channels follow the [AsyncAPI 2.x specification](https://www.asyncapi.com/) and are available over WebSocket and AMQP transports.
+
+## Transports
+
+VOLLEY OSA supports WebSocket and AMQP so you can choose the transport that best fits your infrastructure. Both transports expose the same channels and message schemas.
+
+| Transport | Base URL |
+|-----------|----------|
+| WebSocket | `wss://async.volleyosa.dev/v1` |
+| AMQP | `amqp://async.volleyosa.dev` |
+
+### WebSocket
+
+Append the channel name as a path segment to the WebSocket base URL. The following example connects to the `payload.events` channel:
+
+```javascript
+const ws = new WebSocket('wss://async.volleyosa.dev/v1/payload.events', {
+  headers: { authorization: 'Bearer YOUR_API_KEY' }
+});
+```
+
+### AMQP
+
+Connect to the AMQP broker using your API key as the password. The following example uses the [pika](https://pika.readthedocs.io/) library for Python:
+
+```python
+import pika
+
+credentials = pika.PlainCredentials('volley', 'YOUR_API_KEY')
+params = pika.ConnectionParameters('async.volleyosa.dev', credentials=credentials)
+connection = pika.BlockingConnection(params)
+channel = connection.channel()
+```
+
+## Authentication
+
+VOLLEY OSA authenticates async connections using the same Bearer token you use for REST API requests. Pass your token as the `authorization` header when establishing the connection. The header value must follow the format `Bearer YOUR_API_KEY`.
+
+For WebSocket connections, include the header in the initial HTTP upgrade handshake (as shown in the transport examples above). For AMQP, supply your API key as the password in the `PlainCredentials` object — the username field is always `volley`.
+
+<Warning>
+  Never expose your API key in client-side JavaScript that runs in a browser. Proxy async connections through a backend service that injects the `authorization` header server-side.
+</Warning>
+
+## Channels
+
+VOLLEY OSA exposes two async channels. Each channel carries a distinct message type — choose the one that matches your use case.
+
+| Channel | Purpose | Message Type |
+|---------|---------|--------------|
+| `payload.events` | Discrete lifecycle and state-change notifications | Event envelope (JSON) |
+| `payload.telemetry` | Continuous sensor and operational data from active payloads | Telemetry frame (JSON) |
+
+All messages are JSON-encoded UTF-8 text frames.
+
+## Filtering
+
+By default, a connection to either channel receives messages for **all payloads** your API key has access to. To narrow the stream to a single payload, append a `payload_id` query parameter to the connection URL:
+
+```
+wss://async.volleyosa.dev/v1/payload.events?payload_id=pl_7f3a9c2b
+```
+
+You can supply `payload_id` on both WebSocket and AMQP connections. For AMQP, append the query string to the virtual-host path in your connection parameters.
+
+<Tip>
+  Always implement reconnection with exponential backoff. Transient network interruptions, planned maintenance windows, and rolling server restarts can all close your connection. Start with a 1-second delay, double it on each failure, and cap at 60 seconds. Reset the counter after a successful message is received.
+</Tip>
+
+<Note>
+  For the full message envelope schema and a complete list of event types or telemetry fields, see the individual channel reference pages: [payload.events](/async-api/events) and [payload.telemetry](/async-api/telemetry).
+</Note>

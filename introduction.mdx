@@ -1,0 +1,69 @@
+---
+title: "VOLLEY OSA: Modular Payload Integration for the VOLLEY Platform"
+sidebarTitle: "Introduction"
+description: "VOLLEY OSA is an open-systems interface standard for integrating non-kinetic payload modules into the VOLLEY platform using REST and async APIs."
+---
+
+VOLLEY OSA (Open Systems Architecture) is the Interface Control Document (ICD) that defines how non-kinetic payload modules connect to the VOLLEY platform. It specifies REST and asynchronous API contracts so that payload developers and system integrators can build, register, and operate payloads without needing access to VOLLEY's internal implementation. If you are responsible for integrating a payload module — whether you are writing firmware, building middleware, or designing a system-level interface — this documentation is your starting point.
+
+## What is VOLLEY OSA?
+
+VOLLEY OSA is an open-systems interface standard grounded in the Modular Open Systems Approach (MOSA). MOSA is a DoD-aligned acquisition and design strategy that mandates well-defined, publicly accessible interfaces between major system components so that modules can be developed, upgraded, and replaced independently without vendor lock-in.
+
+VOLLEY OSA puts MOSA into practice by publishing a formal ICD — version 0.1 — that governs every integration point between VOLLEY and the payload layer. The ICD specifies:
+
+- **Interface contracts**: the exact shape of every REST endpoint request and response.
+- **Async channels**: the AsyncAPI channels over which payloads stream telemetry and surface lifecycle events.
+- **Authentication model**: how API keys are issued and presented to establish trust.
+- **Lifecycle semantics**: how payloads transition through states from registration to deregistration.
+
+Because the ICD is the single source of truth, payload teams can develop and test against it independently, and VOLLEY platform engineers can evolve internal components without breaking conformant integrations.
+
+## Who Is This For?
+
+VOLLEY OSA is written for two primary audiences:
+
+- **Payload developers** who are building or adapting a non-kinetic payload module — such as an electro-optical sensor, signals intelligence package, or electronic warfare system — and need to expose the right interfaces so VOLLEY can command and monitor it.
+- **System integrators** who are responsible for connecting one or more payload modules to a deployed VOLLEY instance, validating conformance, and maintaining the integration over time.
+
+Both audiences will work directly with the REST API and AsyncAPI definitions described in this documentation set. Familiarity with HTTP, JSON, and publish/subscribe messaging patterns is assumed.
+
+## What You Can Do
+
+VOLLEY OSA exposes four core integration capabilities. Each is backed by a dedicated set of endpoints or async channels.
+
+<CardGroup cols={2}>
+  <Card title="Register Payloads" icon="plug">
+    Declare a new payload module to the VOLLEY platform, supplying its type, version, and capability set so VOLLEY can route commands and allocate resources appropriately.
+  </Card>
+  <Card title="Send Commands" icon="terminal">
+    Dispatch typed instructions to a registered payload and receive a synchronous acknowledgment while the payload executes the command asynchronously.
+  </Card>
+  <Card title="Monitor Status" icon="chart-line">
+    Poll or stream the real-time operational state of any registered payload — including connectivity, health indicators, and last-known activity.
+  </Card>
+  <Card title="Stream Telemetry" icon="wave-sine">
+    Subscribe to the `payload.telemetry` AsyncAPI channel to receive a continuous feed of sensor and operational data emitted by active payloads.
+  </Card>
+</CardGroup>
+
+## Interface Overview
+
+VOLLEY OSA defines two complementary interface types that together cover both request/response and streaming interaction patterns:
+
+- **REST API** — A synchronous HTTP/JSON API for lifecycle management operations: registering payloads, querying lists and individual records, issuing commands, and reading status snapshots. All REST endpoints are versioned under `/v1`.
+  - `GET /payloads` — list all registered payloads
+  - `POST /payloads` — register a new payload
+  - `GET /payloads/{id}` — retrieve a specific payload record
+  - `POST /payloads/{id}/commands` — dispatch a command to a payload
+  - `GET /payloads/{id}/status` — read the current status of a payload
+
+- **AsyncAPI** — An event-driven, publish/subscribe interface for high-frequency and asynchronous data flows. Payloads publish to two channels:
+  - `payload.telemetry` — continuous sensor and operational data streams
+  - `payload.events` — discrete lifecycle and state-change notifications
+
+Use the REST API when you need deterministic request/response semantics. Use the AsyncAPI channels when you need low-latency, continuous data or want to react to state changes without polling.
+
+<Note>
+  VOLLEY OSA v0.1 is a **concept seed** release. It covers non-kinetic payloads only and is designated **UNCLASSIFIED**. Interfaces, field names, and channel definitions are subject to change before a production-stable release. Review the changelog before upgrading between minor versions.
+</Note>

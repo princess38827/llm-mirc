@@ -1,0 +1,279 @@
+---
+title: "REST API Endpoints for Payloads"
+sidebarTitle: "Payloads"
+description: "Reference for VOLLEY OSA payload management endpoints — register, list, retrieve, and deregister payload modules via the REST API."
+---
+
+Payloads are the core resource of the VOLLEY OSA platform. Each payload represents a non-kinetic module — a sensor, emitter, data collector, or other capability unit — registered with and managed by VOLLEY. The endpoints documented here let you list all registered payloads, register new ones, retrieve individual payload records, and deregister payloads that are no longer in use. For sending commands to a payload or checking its live operational status, see [Commands](/api-reference/commands) and [Status](/api-reference/status).
+
+---
+
+### GET /payloads
+
+List all payloads currently registered with your VOLLEY OSA account. Results are paginated and can be filtered by payload type or lifecycle status.
+
+**Endpoint**
+
+```
+GET https://api.volleyosa.dev/v1/payloads
+```
+
+#### Query Parameters
+
+<ParamField query="type" type="string">
+  Filter results to payloads of a specific type (e.g., `sensor`, `emitter`, `collector`). When omitted, payloads of all types are returned.
+</ParamField>
+
+<ParamField query="status" type="string">
+  Filter results by lifecycle status. Accepted values: `registered`, `active`, `inactive`, `error`, `deregistered`. When omitted, all statuses are included.
+</ParamField>
+
+<ParamField query="limit" type="integer" default="20">
+  Maximum number of payloads to return in a single response. Accepted range: `1`–`100`. Defaults to `20`.
+</ParamField>
+
+<ParamField query="offset" type="integer" default="0">
+  Zero-based index of the first result to return. Use in combination with `limit` to paginate through the full result set. Defaults to `0`.
+</ParamField>
+
+#### Response Fields
+
+<ResponseField name="payloads" type="array">
+  An array of payload objects matching the query. Each object contains the full payload record.
+
+  <Expandable title="Payload object fields">
+    <ResponseField name="id" type="string">
+      Unique identifier for the payload (e.g., `pl_7f3a9c2b`).
+    </ResponseField>
+    <ResponseField name="name" type="string">
+      Human-readable name assigned at registration.
+    </ResponseField>
+    <ResponseField name="type" type="string">
+      The payload type (e.g., `sensor`, `emitter`).
+    </ResponseField>
+    <ResponseField name="version" type="string">
+      The payload's software or firmware version string.
+    </ResponseField>
+    <ResponseField name="status" type="string">
+      Current lifecycle status: `registered`, `active`, `inactive`, `error`, or `deregistered`.
+    </ResponseField>
+    <ResponseField name="capabilities" type="array">
+      List of capability identifiers declared at registration (e.g., `["START_CAPTURE", "STOP_CAPTURE"]`).
+    </ResponseField>
+    <ResponseField name="metadata" type="object">
+      Arbitrary key-value metadata supplied at registration.
+    </ResponseField>
+    <ResponseField name="registered_at" type="string">
+      ISO 8601 timestamp of when the payload was registered.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="total" type="integer">
+  Total number of payloads matching the filter criteria, regardless of pagination.
+</ResponseField>
+
+<ResponseField name="limit" type="integer">
+  The `limit` value applied to this response.
+</ResponseField>
+
+<ResponseField name="offset" type="integer">
+  The `offset` value applied to this response.
+</ResponseField>
+
+#### Example Request
+
+```bash
+curl -X GET "https://api.volleyosa.dev/v1/payloads?type=sensor&status=active&limit=20&offset=0" \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+#### Example Response
+
+```json
+{
+  "payloads": [
+    {
+      "id": "pl_7f3a9c2b",
+      "name": "Alpha Sensor Array",
+      "type": "sensor",
+      "version": "2.1.0",
+      "status": "active",
+      "capabilities": ["START_CAPTURE", "STOP_CAPTURE", "CALIBRATE"],
+      "metadata": { "zone": "sector-7", "operator": "team-bravo" },
+      "registered_at": "2024-01-10T09:00:00Z"
+    },
+    {
+      "id": "pl_4e8d1a5f",
+      "name": "Bravo Sensor Node",
+      "type": "sensor",
+      "version": "1.9.4",
+      "status": "active",
+      "capabilities": ["START_CAPTURE", "STOP_CAPTURE"],
+      "metadata": { "zone": "sector-3" },
+      "registered_at": "2024-01-12T14:30:00Z"
+    }
+  ],
+  "total": 2,
+  "limit": 20,
+  "offset": 0
+}
+```
+
+---
+
+### POST /payloads
+
+Register a new payload with the VOLLEY OSA platform. A successful registration returns the full payload object and an HTTP `201 Created` status. Payload names must be unique within your account — submitting a duplicate name returns a `409 Conflict` error.
+
+**Endpoint**
+
+```
+POST https://api.volleyosa.dev/v1/payloads
+```
+
+#### Request Body
+
+<ParamField body="name" type="string" required>
+  A unique, human-readable name for the payload. Must be unique within your account. Maximum 128 characters.
+</ParamField>
+
+<ParamField body="type" type="string" required>
+  The payload type classification (e.g., `sensor`, `emitter`, `collector`, `relay`). Used for filtering and capability validation.
+</ParamField>
+
+<ParamField body="version" type="string" required>
+  The software or firmware version of the payload module (e.g., `2.1.0`). Use semantic versioning where possible.
+</ParamField>
+
+<ParamField body="capabilities" type="array">
+  Optional. An array of command type strings that this payload is able to receive and execute (e.g., `["START_CAPTURE", "STOP_CAPTURE", "CALIBRATE"]`). Declaring capabilities enables validation when sending commands.
+</ParamField>
+
+<ParamField body="metadata" type="object">
+  Optional. A free-form JSON object for storing arbitrary metadata associated with the payload, such as location identifiers, operator assignments, or configuration tags.
+</ParamField>
+
+#### Response Fields
+
+The response body is the newly created payload object. Fields are identical to those described in the [GET /payloads](#get-payloads) payload object, with the addition of an HTTP `201 Created` status code.
+
+#### Example Request
+
+```bash
+curl -X POST https://api.volleyosa.dev/v1/payloads \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Charlie Emitter Unit",
+    "type": "emitter",
+    "version": "3.0.1",
+    "capabilities": ["EMIT_PULSE", "ADJUST_FREQUENCY", "STANDBY"],
+    "metadata": {
+      "zone": "sector-12",
+      "operator": "team-delta"
+    }
+  }'
+```
+
+#### Example Response
+
+```json
+{
+  "id": "pl_9c2e4f7a",
+  "name": "Charlie Emitter Unit",
+  "type": "emitter",
+  "version": "3.0.1",
+  "status": "registered",
+  "capabilities": ["EMIT_PULSE", "ADJUST_FREQUENCY", "STANDBY"],
+  "metadata": {
+    "zone": "sector-12",
+    "operator": "team-delta"
+  },
+  "registered_at": "2024-01-15T11:45:00Z"
+}
+```
+
+<Note>
+  Newly registered payloads start in the `registered` status. They transition to `active` once the VOLLEY platform confirms a live connection from the payload module.
+</Note>
+
+---
+
+### GET /payloads/{id}
+
+Retrieve the full record for a single registered payload by its unique identifier.
+
+**Endpoint**
+
+```
+GET https://api.volleyosa.dev/v1/payloads/{id}
+```
+
+#### Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the payload to retrieve (e.g., `pl_7f3a9c2b`). This is the `id` field returned when the payload was registered.
+</ParamField>
+
+#### Response Fields
+
+The response body is a single payload object. Fields are identical to those described in the [GET /payloads](#get-payloads) payload object.
+
+#### Example Request
+
+```bash
+curl -X GET https://api.volleyosa.dev/v1/payloads/pl_7f3a9c2b \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+#### Example Response
+
+```json
+{
+  "id": "pl_7f3a9c2b",
+  "name": "Alpha Sensor Array",
+  "type": "sensor",
+  "version": "2.1.0",
+  "status": "active",
+  "capabilities": ["START_CAPTURE", "STOP_CAPTURE", "CALIBRATE"],
+  "metadata": {
+    "zone": "sector-7",
+    "operator": "team-bravo"
+  },
+  "registered_at": "2024-01-10T09:00:00Z"
+}
+```
+
+---
+
+### DELETE /payloads/{id}
+
+Deregister a payload, permanently removing it from the VOLLEY OSA platform. This action is irreversible. A successful deregistration returns HTTP `204 No Content` with an empty response body.
+
+**Endpoint**
+
+```
+DELETE https://api.volleyosa.dev/v1/payloads/{id}
+```
+
+#### Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the payload to deregister (e.g., `pl_7f3a9c2b`).
+</ParamField>
+
+#### Response
+
+On success, the API returns `204 No Content` with no response body. If the payload ID does not exist, a `404 Not Found` error is returned.
+
+#### Example Request
+
+```bash
+curl -X DELETE https://api.volleyosa.dev/v1/payloads/pl_7f3a9c2b \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+<Warning>
+  Deregistering a payload is permanent and cannot be undone. Any pending commands targeting the payload will be cancelled. If you need to temporarily take a payload offline, consider updating its status to `inactive` instead of deregistering it.
+</Warning>

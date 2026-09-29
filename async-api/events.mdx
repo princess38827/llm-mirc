@@ -1,0 +1,234 @@
+---
+title: "AsyncAPI payload.events Channel Reference"
+sidebarTitle: "Events"
+description: "Message schema and event types for the VOLLEY OSA payload.events AsyncAPI channel — lifecycle changes, command results, and error notifications."
+---
+
+The `payload.events` channel delivers discrete notifications whenever a payload changes state, completes a command, or encounters an error. Unlike the telemetry channel, events are not emitted on a fixed schedule — each message is triggered by a specific occurrence in the payload lifecycle. Subscribe to this channel when you need to react to state transitions, audit command outcomes, or surface operational alerts in your integration.
+
+## Channel
+
+| Property | Value |
+|----------|-------|
+| Channel name | `payload.events` |
+| Transports | WebSocket, AMQP |
+| Message format | JSON |
+| Direction | Server → Client (subscribe only) |
+
+## Connection
+
+Connect to the channel by appending its name to the WebSocket base URL or subscribing to the equivalent AMQP queue. Pass your Bearer token as the `authorization` header on connection setup.
+
+```javascript
+const ws = new WebSocket('wss://async.volleyosa.dev/v1/payload.events', {
+  headers: { authorization: 'Bearer YOUR_API_KEY' }
+});
+
+ws.addEventListener('message', (event) => {
+  const message = JSON.parse(event.data);
+  console.log(`Received event: ${message.type} for payload ${message.payload_id}`);
+});
+```
+
+To filter events for a specific payload, append the `payload_id` query parameter:
+
+```javascript
+const ws = new WebSocket(
+  'wss://async.volleyosa.dev/v1/payload.events?payload_id=pl_7f3a9c2b',
+  { headers: { authorization: 'Bearer YOUR_API_KEY' } }
+);
+```
+
+## Message Envelope
+
+Every message published on `payload.events` shares the same outer envelope. The `data` field contains event-specific fields that vary by `type` — see [Event Types](#event-types) below.
+
+<ResponseField name="type" type="string" required>
+  The event type identifier. Use this field to determine how to parse the `data` object. Possible values: `command_completed`, `status_changed`, `error`, `payload_registered`, `payload_deregistered`.
+</ResponseField>
+
+<ResponseField name="payload_id" type="string" required>
+  The unique identifier of the payload that emitted this event, e.g. `pl_7f3a9c2b`.
+</ResponseField>
+
+<ResponseField name="timestamp" type="string" required>
+  ISO 8601 UTC timestamp recording when the event occurred on the server, e.g. `2024-01-15T12:05:30.000Z`.
+</ResponseField>
+
+<ResponseField name="data" type="object" required>
+  Event-specific payload. The shape of this object depends on the value of `type`. Always check `type` before reading fields from `data`.
+</ResponseField>
+
+## Event Types
+
+### `command_completed`
+
+Emitted when a previously dispatched command finishes execution on a payload, regardless of whether it succeeded or failed.
+
+**`data` fields:**
+
+<ResponseField name="data.command_id" type="string" required>
+  The unique identifier of the command that finished, matching the `id` returned when the command was submitted.
+</ResponseField>
+
+<ResponseField name="data.result" type="string" required>
+  Execution outcome. One of `"success"` or `"failure"`.
+</ResponseField>
+
+<ResponseField name="data.output" type="object" required>
+  Command-specific output data. The schema of this object is defined by the command type. May be an empty object `{}` for commands that produce no output.
+</ResponseField>
+
+**Example:**
+
+```json
+{
+  "type": "command_completed",
+  "payload_id": "pl_7f3a9c2b",
+  "timestamp": "2024-01-15T12:05:30.000Z",
+  "data": {
+    "command_id": "cmd_a1b2c3d4",
+    "result": "success",
+    "output": {
+      "frames_captured": 120,
+      "storage_path": "/recordings/2024-01-15/cmd_a1b2c3d4.mp4"
+    }
+  }
+}
+```
+
+---
+
+### `status_changed`
+
+Emitted whenever a payload transitions from one operational status to another. Use this event to track the payload lifecycle and drive state-dependent UI or automation logic.
+
+**`data` fields:**
+
+<ResponseField name="data.previous_status" type="string" required>
+  The status the payload held before the transition, e.g. `"initializing"`.
+</ResponseField>
+
+<ResponseField name="data.current_status" type="string" required>
+  The status the payload has transitioned to, e.g. `"active"`.
+</ResponseField>
+
+<ResponseField name="data.reason" type="string" required>
+  A human-readable description of why the transition occurred. Useful for logging and operator displays.
+</ResponseField>
+
+**Example:**
+
+```json
+{
+  "type": "status_changed",
+  "payload_id": "pl_7f3a9c2b",
+  "timestamp": "2024-01-15T12:04:58.000Z",
+  "data": {
+    "previous_status": "initializing",
+    "current_status": "active",
+    "reason": "Self-test passed; payload ready for tasking."
+  }
+}
+```
+
+---
+
+### `error`
+
+Emitted when the payload encounters a fault condition. The `severity` field indicates how you should respond — warnings are informational, errors require attention, and critical faults typically indicate the payload is no longer operational.
+
+**`data` fields:**
+
+<ResponseField name="data.error_code" type="string" required>
+  A machine-readable error code, e.g. `"EO_SENSOR_TIMEOUT"`. Use this for programmatic handling and alerting rules.
+</ResponseField>
+
+<ResponseField name="data.message" type="string" required>
+  A human-readable description of the error condition.
+</ResponseField>
+
+<ResponseField name="data.severity" type="string" required>
+  Severity level. One of `"warning"`, `"error"`, or `"critical"`.
+</ResponseField>
+
+**Example:**
+
+```json
+{
+  "type": "error",
+  "payload_id": "pl_7f3a9c2b",
+  "timestamp": "2024-01-15T12:06:15.000Z",
+  "data": {
+    "error_code": "EO_SENSOR_TIMEOUT",
+    "message": "Electro-optical sensor failed to respond within the expected window.",
+    "severity": "error"
+  }
+}
+```
+
+---
+
+### `payload_registered`
+
+Emitted when a new payload is registered with VOLLEY OSA and becomes available for tasking. Subscribe without a `payload_id` filter to discover newly onboarded payloads.
+
+**`data` fields:**
+
+<ResponseField name="data.payload_id" type="string" required>
+  The unique identifier assigned to the newly registered payload.
+</ResponseField>
+
+<ResponseField name="data.name" type="string" required>
+  The human-readable display name of the payload as configured at registration.
+</ResponseField>
+
+<ResponseField name="data.type" type="string" required>
+  The payload type, e.g. `"electro-optical"`, `"rf"`, or `"cyber"`.
+</ResponseField>
+
+**Example:**
+
+```json
+{
+  "type": "payload_registered",
+  "payload_id": "pl_7f3a9c2b",
+  "timestamp": "2024-01-15T11:59:02.000Z",
+  "data": {
+    "payload_id": "pl_7f3a9c2b",
+    "name": "EO Sensor Alpha",
+    "type": "electro-optical"
+  }
+}
+```
+
+---
+
+### `payload_deregistered`
+
+Emitted when a payload is removed from VOLLEY OSA. After this event, the payload will no longer emit telemetry or events.
+
+**`data` fields:**
+
+<ResponseField name="data.payload_id" type="string" required>
+  The unique identifier of the payload that was deregistered.
+</ResponseField>
+
+**Example:**
+
+```json
+{
+  "type": "payload_deregistered",
+  "payload_id": "pl_7f3a9c2b",
+  "timestamp": "2024-01-15T18:30:00.000Z",
+  "data": {
+    "payload_id": "pl_7f3a9c2b"
+  }
+}
+```
+
+---
+
+<Note>
+  The schema of the `data` field varies by `type` — always read the `type` field first before attempting to access any properties inside `data`. Unrecognized event types may appear as VOLLEY OSA adds new lifecycle events; implement a default/fallthrough branch in your message handler to handle unknown types gracefully.
+</Note>

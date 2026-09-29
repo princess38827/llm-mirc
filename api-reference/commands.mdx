@@ -1,0 +1,109 @@
+---
+title: "REST API Endpoints for Payload Commands"
+sidebarTitle: "Commands"
+description: "Reference for POST /payloads/{id}/commands — dispatch commands to a registered VOLLEY OSA payload and track execution."
+---
+
+Commands are the mechanism through which you instruct a registered VOLLEY OSA payload to take action — starting a capture sequence, adjusting operational parameters, entering standby, or any other behavior the payload declares as a capability. When you send a command, the API accepts it synchronously and returns a command record immediately. Execution then happens asynchronously on the payload itself, allowing your application to remain responsive while the payload processes the instruction. Use the returned `command_id` to correlate events from the payload's events channel as execution progresses.
+
+---
+
+### POST /payloads/{id}/commands
+
+Dispatch a command to a specific registered payload. The API validates the request, enqueues the command for delivery to the payload, and returns a `202 Accepted` response containing the new command record.
+
+**Endpoint**
+
+```
+POST https://api.volleyosa.dev/v1/payloads/{id}/commands
+```
+
+#### Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the target payload (e.g., `pl_7f3a9c2b`). The payload must be in `active` status to accept commands.
+</ParamField>
+
+#### Request Body
+
+<ParamField body="type" type="string" required>
+  The command type to dispatch. This must match one of the command type strings declared in the payload's `capabilities` array at registration time (e.g., `START_CAPTURE`, `EMIT_PULSE`). See [Common Command Types](#common-command-types) for examples.
+</ParamField>
+
+<ParamField body="parameters" type="object">
+  Optional. A JSON object containing command-specific parameters. The expected fields depend on the `type` — for example, a `START_CAPTURE` command might accept `duration_seconds` and `resolution`. Consult your payload's capability documentation for valid parameter schemas.
+</ParamField>
+
+<ParamField body="priority" type="integer" default="5">
+  Optional. An integer between `1` (lowest priority) and `10` (highest priority) indicating the urgency of the command relative to others in the payload's queue. Defaults to `5`. Higher-priority commands are delivered ahead of lower-priority ones when the queue contains multiple pending instructions.
+</ParamField>
+
+#### Response Fields
+
+<ResponseField name="command_id" type="string">
+  Unique identifier assigned to this command (e.g., `cmd_a1b2c3d4`). Use this to correlate execution events received through the payload's events channel.
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  The initial status of the command after submission. Always `"accepted"` for a `202` response, indicating the command has been validated and enqueued for delivery.
+</ResponseField>
+
+<ResponseField name="payload_id" type="string">
+  The identifier of the payload this command was dispatched to. Mirrors the `{id}` path parameter.
+</ResponseField>
+
+<ResponseField name="submitted_at" type="string">
+  ISO 8601 timestamp recording when the command was received and accepted by the API.
+</ResponseField>
+
+#### Example Request
+
+```bash
+curl -X POST https://api.volleyosa.dev/v1/payloads/pl_7f3a9c2b/commands \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"type": "START_CAPTURE", "parameters": {"duration_seconds": 60}, "priority": 8}'
+```
+
+#### Example Response
+
+```json
+{
+  "command_id": "cmd_a1b2c3d4",
+  "status": "accepted",
+  "payload_id": "pl_7f3a9c2b",
+  "submitted_at": "2024-01-15T12:00:00Z"
+}
+```
+
+---
+
+## Command Execution
+
+Sending a command to the API is a two-phase process. In the first phase, the API validates your request and accepts it synchronously, returning `202 Accepted` and a command record. This guarantees your instruction has been received — it does not mean the payload has already acted on it.
+
+In the second phase, the VOLLEY platform delivers the command to the payload asynchronously. The payload processes the instruction, transitions through execution states (`queued` → `delivering` → `executing` → `completed` or `failed`), and emits events as its state changes. You can track these transitions in real time by subscribing to the `payload.events` channel using the AsyncAPI specification for your account.
+
+Use the `command_id` from the API response to filter the event stream for updates specific to your command. If the payload is temporarily unreachable, the platform retries delivery within the window defined by your account's retry policy.
+
+---
+
+## Common Command Types
+
+The specific commands a payload supports depend on its declared `capabilities`. The following table lists commonly used command types across the VOLLEY OSA payload ecosystem.
+
+| Command Type | Applicable Payload Types | Description |
+|---|---|---|
+| `START_CAPTURE` | `sensor`, `collector` | Begin a data capture or recording session |
+| `STOP_CAPTURE` | `sensor`, `collector` | Halt an in-progress capture session |
+| `CALIBRATE` | `sensor`, `emitter` | Run the payload's self-calibration routine |
+| `EMIT_PULSE` | `emitter` | Trigger a single emission pulse |
+| `ADJUST_FREQUENCY` | `emitter` | Update the emitter's operating frequency |
+| `STANDBY` | All | Place the payload into a low-power standby state |
+| `WAKE` | All | Resume operation from standby |
+| `SELF_TEST` | All | Execute the payload's built-in diagnostic self-test |
+| `REBOOT` | All | Perform a controlled restart of the payload module |
+
+<Note>
+  The command types in the table above are illustrative examples. The exact commands your payload accepts are determined by the `capabilities` array you declared when registering it. Attempting to dispatch a command type not listed in the payload's capabilities will return a `422 Validation Error`.
+</Note>

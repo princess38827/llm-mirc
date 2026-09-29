@@ -1,0 +1,90 @@
+---
+title: "VOLLEY OSA REST API Reference Overview"
+sidebarTitle: "Overview"
+description: "Complete reference for the VOLLEY OSA REST API — base URL, authentication, request format, error codes, and rate limits."
+---
+
+The VOLLEY OSA REST API gives you programmatic control over non-kinetic payload integration within the VOLLEY platform. Every capability exposed through the platform — registering payloads, dispatching commands, and monitoring operational status — is available through this API. This reference covers everything you need to start making authenticated requests: the base URL, authentication scheme, expected content types, error codes, rate limits, and versioning policy.
+
+## Base URL
+
+All API requests are made to the following base URL. Every endpoint path in this reference is appended to it.
+
+```
+https://api.volleyosa.dev/v1
+```
+
+The version segment (`/v1`) is part of the URL and will not change for the lifetime of the v1 API. See [Versioning](#versioning) for the full policy.
+
+## Authentication
+
+The VOLLEY OSA API uses API key–based authentication. You must include your API key as a Bearer token in the `Authorization` header of every request.
+
+```http
+Authorization: Bearer YOUR_API_KEY
+```
+
+If the header is missing or the key is invalid, the API returns a `401 Unauthorized` response. If the key is valid but lacks permission for the requested operation, you receive `403 Forbidden`. Full details and code examples are available in the [Authentication guide](/guides/authentication).
+
+## Content Type
+
+All request bodies must be JSON, and all successful response bodies are returned as JSON. Set the `Content-Type` header on every request that sends a body.
+
+```http
+Content-Type: application/json
+```
+
+Requests that omit this header when sending a body, or that submit a malformed JSON payload, will receive a `400 Bad Request` response.
+
+## Error Codes
+
+When a request cannot be fulfilled, the API returns an error object with three fields:
+
+```json
+{
+  "error": "error_code",
+  "message": "Human-readable description of the error.",
+  "code": 400
+}
+```
+
+The `error` field contains a machine-readable code you can use for programmatic handling. The `message` field contains a human-readable explanation suitable for logging or display. The `code` field mirrors the HTTP status code.
+
+| HTTP Status | `error` Code | Meaning |
+|-------------|--------------|---------|
+| `400` | `bad_request` | Invalid request body or parameters |
+| `401` | `unauthorized` | Missing or invalid API key |
+| `403` | `forbidden` | API key lacks permission for this operation |
+| `404` | `not_found` | Payload or resource not found |
+| `409` | `conflict` | Payload with this name already exists |
+| `422` | `validation_error` | Request body failed validation |
+| `429` | `rate_limited` | Too many requests; retry after the `Retry-After` header value |
+| `500` | `internal_error` | Unexpected server error |
+
+<Note>
+  For `429` responses, check the `Retry-After` header for the number of seconds to wait before retrying. Retrying immediately will result in additional `429` responses until the window resets.
+</Note>
+
+## Rate Limits
+
+Each API key is limited to **1,000 requests per hour**. The current window's limit status is communicated through response headers present on every API response.
+
+| Header | Description |
+|--------|-------------|
+| `X-RateLimit-Limit` | Maximum number of requests allowed per hour for your key |
+| `X-RateLimit-Remaining` | Number of requests remaining in the current window |
+| `X-RateLimit-Reset` | Unix timestamp at which the current window resets |
+
+When you exceed the rate limit, the API returns a `429 rate_limited` error. Use the `Retry-After` response header — provided alongside the standard rate limit headers — to determine how many seconds to wait before making another request.
+
+<Tip>
+  If your integration needs higher throughput, contact the VOLLEY OSA team to discuss elevated rate limit tiers for your API key.
+</Tip>
+
+## Versioning
+
+The API version is encoded directly in the URL path (e.g., `/v1`). This means you always know exactly which version your client is targeting, and version upgrades are explicit opt-ins — simply change the path prefix.
+
+**Current version:** `v1`
+
+Breaking changes — such as removed fields, changed field types, or altered endpoint behavior — will always be introduced under a new version number (e.g., `/v2`). Additive changes, such as new optional fields or new endpoints, may be made to an existing version without notice. The `v1` API will remain supported for a minimum of 12 months after any successor version is released.

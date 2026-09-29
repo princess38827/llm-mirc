@@ -1,0 +1,102 @@
+---
+title: "Payload Data Model and Lifecycle"
+sidebarTitle: "Payload Model"
+description: "The VOLLEY OSA payload object — its fields, supported types, and lifecycle states from registration through deregistration."
+---
+
+In VOLLEY OSA, a **payload** is the platform's representation of a connected non-kinetic module — an EO sensor, RF emitter, cyber tool, or any other conformant device. Every payload you register with the platform is persisted as a payload object: a structured record that captures the module's identity, declared capabilities, and current lifecycle state. Understanding this object is fundamental to working with the REST API, because nearly every endpoint either creates, reads, updates, or transitions a payload object.
+
+## Payload Object
+
+When you create a payload via `POST /payloads`, the platform returns a fully populated payload object. The same structure is returned by `GET /payloads`, `GET /payloads/{id}`, and `GET /payloads/{id}/status`.
+
+```json
+{
+  "id": "pl_7f3a9c2b",
+  "name": "EO-Sensor-Alpha",
+  "type": "electro-optical",
+  "version": "1.0.0",
+  "capabilities": ["imaging", "tracking", "geo-registration"],
+  "status": "active",
+  "created_at": "2024-01-15T10:30:00Z",
+  "updated_at": "2024-01-15T11:00:00Z"
+}
+```
+
+The fields in this object are defined as follows:
+
+<ParamField path="id" type="string" required>
+  Unique identifier assigned by the platform at registration time. You use this value in all subsequent API calls that target a specific payload (e.g., `GET /payloads/{id}`). The `id` is immutable — it does not change across lifecycle transitions.
+</ParamField>
+
+<ParamField path="name" type="string" required>
+  Human-readable label for the payload. You supply this value at registration and it is used in platform logs, dashboards, and event messages. Names do not need to be unique across payloads, but using descriptive, unique names simplifies operational monitoring.
+</ParamField>
+
+<ParamField path="type" type="string" required>
+  Payload category. The platform uses this field for filtering, routing, and capability discovery. See [Payload Types](#payload-types) below for the supported values.
+</ParamField>
+
+<ParamField path="version" type="string" required>
+  The software or firmware version string for the payload module, as reported by the integrator at registration. The platform stores this value for auditing and compatibility tracking but does not enforce a specific versioning scheme.
+</ParamField>
+
+<ParamField path="capabilities" type="string[]" required>
+  An array of capability tags declaring what functions the payload can perform. These tags are used by the platform's discovery layer to match payloads to mission requirements. See [Capabilities](#capabilities) below for usage guidance.
+</ParamField>
+
+<ParamField path="status" type="string" required>
+  The current lifecycle status of the payload. Valid values are `registered`, `active`, `inactive`, and `deregistered`. See [Lifecycle States](#lifecycle-states) below for the full state machine.
+</ParamField>
+
+<ParamField path="created_at" type="string (ISO 8601)" required>
+  The UTC timestamp at which the payload was registered with the platform. This value is set by the platform and cannot be modified.
+</ParamField>
+
+<ParamField path="updated_at" type="string (ISO 8601)" required>
+  The UTC timestamp of the most recent change to the payload object. The platform updates this field whenever `status`, `capabilities`, or any other mutable field changes.
+</ParamField>
+
+## Payload Types
+
+The `type` field must be one of the following platform-recognized values:
+
+| Value | Description |
+|---|---|
+| `electro-optical` | EO/IR sensor payloads capable of imaging, tracking, or scene analysis. |
+| `rf` | Radio-frequency payloads including emitters, receivers, jammers, and SIGINT collection systems. |
+| `cyber` | Cyber-effect or network-operations payloads operating in the electromagnetic spectrum or on digital networks. |
+| `acoustic` | Acoustic sensing or projection payloads. |
+| `chemical-biological` | CBRN detection or sampling payloads. |
+| `generic` | Any payload type not covered by the above categories. Use this value when onboarding novel payload classes and work with the platform team to define a dedicated type value. |
+
+## Lifecycle States
+
+Every payload moves through a defined set of states from the moment it is registered until it is removed from the platform. Understanding these transitions helps you anticipate which operations are valid at each stage and what events to expect on the `payload.events` async channel.
+
+```
+registered → active → inactive → deregistered
+                ↑__________|
+```
+
+- **`registered`** — The payload object has been created via `POST /payloads` and the platform has assigned it an `id`, but the payload has not yet been activated. This is the initial state for all newly created payloads. From here, the platform or an authorized operator can transition the payload to `active`.
+
+- **`active`** — The payload is operational. It is eligible to receive commands via `POST /payloads/{id}/commands` and is expected to publish telemetry to `payload.telemetry` and lifecycle events to `payload.events`. This is the primary operational state.
+
+- **`inactive`** — The payload has been suspended but not removed. It retains its registration record and `id`, but it will not receive commands and should not be publishing telemetry. A payload transitions from `active` to `inactive` when an operator issues a suspend command, or when the platform detects a loss-of-contact condition. From `inactive`, a payload can return to `active` or proceed to `deregistered`.
+
+- **`deregistered`** — The payload has been permanently removed from the platform. Its object record is retained for audit purposes but is no longer eligible for commands or telemetry. Deregistration is a terminal state — you cannot reactivate a deregistered payload. To re-integrate the same physical module, register it as a new payload.
+
+A `payload.events` message is emitted on every state transition, giving downstream subscribers an authoritative record of when each change occurred and what triggered it.
+
+## Capabilities
+
+The `capabilities` array is a declarative list of string tags that advertise what a payload can do. You supply this list at registration and the platform indexes it for discovery queries. When a mission planner or automated system asks "which payloads support geo-registration?", the platform evaluates this field to return matching payloads.
+
+Capability tags are free-form strings, but you should follow these conventions to maximize interoperability:
+
+- Use lowercase, hyphen-separated terms (e.g., `geo-registration`, `wide-area-search`).
+- Be specific rather than broad — `target-tracking` is more useful to a discovery query than `sensing`.
+- List only capabilities the payload can perform without additional configuration. Optional or conditionally available functions should be documented in your payload's own integration guide.
+
+Because the platform does not enforce a fixed capability vocabulary in v0.1, coordinate with your platform team to agree on a shared tag set before registering multiple payloads. Consistent tagging is what makes automated discovery reliable.

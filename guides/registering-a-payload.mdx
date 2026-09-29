@@ -1,0 +1,171 @@
+---
+title: "Register a Payload with VOLLEY OSA"
+sidebarTitle: "Register a Payload"
+description: "Step-by-step guide to registering a non-kinetic payload module with the VOLLEY platform using the POST /payloads endpoint."
+---
+
+Before you can send commands to a non-kinetic payload or receive telemetry from it, you must register it with the VOLLEY platform. Registration creates a persistent record of the payload's identity, type, version, and capabilities, and returns a unique payload ID that you will use in every subsequent API interaction. This guide walks you through the complete registration process.
+
+<Steps>
+  <Step title="Prepare payload metadata">
+    Gather the information that describes your payload. At minimum you need a human-readable `name`, a `type` drawn from the supported taxonomy, and the payload software or firmware `version`. Optionally, include a `capabilities` array that enumerates what the payload can do — this enables other platform components to discover and filter payloads by capability.
+
+    ```json
+    {
+      "name": "RF-Emitter-Bravo",
+      "type": "rf",
+      "version": "2.1.0",
+      "capabilities": ["jamming", "direction-finding"]
+    }
+    ```
+  </Step>
+
+  <Step title="Send POST /payloads">
+    Submit your payload metadata to the registration endpoint. Include your API key in the `Authorization` header and set `Content-Type: application/json`.
+
+    **cURL**
+
+    ```bash
+    curl -X POST https://api.volleyosa.dev/v1/payloads \
+      -H "Authorization: Bearer YOUR_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "name": "RF-Emitter-Bravo",
+        "type": "rf",
+        "version": "2.1.0",
+        "capabilities": ["jamming", "direction-finding"]
+      }'
+    ```
+
+    **Python**
+
+    ```python
+    import requests
+
+    headers = {
+        "Authorization": "Bearer YOUR_API_KEY",
+        "Content-Type": "application/json",
+    }
+
+    payload = {
+        "name": "RF-Emitter-Bravo",
+        "type": "rf",
+        "version": "2.1.0",
+        "capabilities": ["jamming", "direction-finding"],
+    }
+
+    response = requests.post(
+        "https://api.volleyosa.dev/v1/payloads",
+        json=payload,
+        headers=headers,
+    )
+    print(response.json())
+    ```
+
+    A successful registration returns `201 Created` with the full payload object in the response body.
+  </Step>
+
+  <Step title="Save the returned payload ID">
+    The response body includes an `id` field — a platform-assigned unique identifier for your payload (e.g., `pl_7f3a9c2b`). Save this value. You will need it to send commands, query status, and identify events on the AsyncAPI channels.
+
+    ```json
+    {
+      "id": "pl_7f3a9c2b",
+      "name": "RF-Emitter-Bravo",
+      "type": "rf",
+      "version": "2.1.0",
+      "capabilities": ["jamming", "direction-finding"],
+      "status": "registered",
+      "registered_at": "2024-11-14T10:32:00Z",
+      "metadata": {}
+    }
+    ```
+  </Step>
+
+  <Step title="Confirm registration with GET /payloads/{id}">
+    Retrieve the newly registered payload to verify that the platform persisted it correctly.
+
+    ```bash
+    curl https://api.volleyosa.dev/v1/payloads/pl_7f3a9c2b \
+      -H "Authorization: Bearer YOUR_API_KEY"
+    ```
+
+    A `200 OK` response containing the payload object confirms that registration succeeded and the payload is available for command dispatch.
+  </Step>
+</Steps>
+
+## Request Schema
+
+The following fields are accepted by `POST /payloads`.
+
+<ParamField body="name" type="string" required>
+  A human-readable identifier for the payload. Must be unique within your VOLLEY OSA environment. Use a descriptive name that reflects the payload's role and physical unit (e.g., `RF-Emitter-Bravo`, `EO-Sensor-Alpha-3`).
+</ParamField>
+
+<ParamField body="type" type="string" required>
+  The payload category. Must be one of the following values:
+
+  - `electro-optical` — camera or imaging sensor
+  - `rf` — radio frequency emitter or receiver
+  - `cyber` — cyber effects payload
+  - `acoustic` — acoustic sensor or emitter
+  - `other` — any payload type not covered by the above categories
+</ParamField>
+
+<ParamField body="version" type="string" required>
+  The semantic version string of the payload's software or firmware (e.g., `2.1.0`). Used for auditing and compatibility checks.
+</ParamField>
+
+<ParamField body="capabilities" type="array of strings">
+  An optional list of capability tags describing what the payload can do. Tags are free-form strings but should follow a consistent convention within your organisation (e.g., `jamming`, `direction-finding`, `spectrum-analysis`). Other platform components may use this array for capability-based payload discovery.
+</ParamField>
+
+<ParamField body="metadata" type="object">
+  An optional dictionary of arbitrary key-value pairs for storing integration-specific data (e.g., asset serial numbers, physical location identifiers, or operator notes). Values must be strings or numbers.
+</ParamField>
+
+## Response
+
+A successful `201 Created` response returns the complete payload object as persisted by the platform.
+
+```json
+{
+  "id": "pl_7f3a9c2b",
+  "name": "RF-Emitter-Bravo",
+  "type": "rf",
+  "version": "2.1.0",
+  "capabilities": ["jamming", "direction-finding"],
+  "status": "registered",
+  "registered_at": "2024-11-14T10:32:00Z",
+  "metadata": {}
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | string | Platform-assigned unique payload identifier. Prefix `pl_` followed by an 8-character hex string. |
+| `name` | string | The name you provided at registration. |
+| `type` | string | The payload type you provided at registration. |
+| `version` | string | The version string you provided at registration. |
+| `capabilities` | array | The capabilities array you provided, or an empty array if omitted. |
+| `status` | string | Initial lifecycle status. Always `registered` immediately after creation. |
+| `registered_at` | string | ISO 8601 timestamp of when the registration was accepted by the platform. |
+| `metadata` | object | The metadata object you provided, or an empty object if omitted. |
+
+## Re-registration
+
+If you attempt to register a payload using a `name` that already exists in your VOLLEY OSA environment, the API returns `409 Conflict`. This prevents duplicate registrations from creating ambiguous platform state.
+
+```json
+{
+  "error": "Conflict",
+  "code": "PAYLOAD_NAME_EXISTS",
+  "message": "A payload named 'RF-Emitter-Bravo' is already registered. Use GET /payloads to retrieve the existing record or choose a unique name."
+}
+```
+
+If you need to update an existing payload's version or capabilities, retrieve the existing record with `GET /payloads/{id}` and contact your administrator about the update workflow for your deployment.
+
+<Tip>
+Use descriptive, role-specific names that include the payload type and a unit designator (e.g., `EO-Sensor-Alpha-3`). Pair this with explicit capability tags rather than encoding capabilities in the name — tagged capabilities can be queried programmatically, while name substrings cannot.
+</Tip>

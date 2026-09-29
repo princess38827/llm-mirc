@@ -1,0 +1,164 @@
+---
+title: "Send Commands to a Payload"
+sidebarTitle: "Send Commands"
+description: "How to dispatch commands to a registered VOLLEY OSA payload using POST /payloads/{id}/commands and interpret the response."
+---
+
+Commands are the primary control mechanism for registered payloads in VOLLEY OSA. When you send a command, the platform synchronously acknowledges receipt and acceptance, then asynchronously routes the instruction to the target payload for execution. This separation of acknowledgment from execution lets your integration remain responsive while the payload performs potentially long-running operations. This guide covers how to construct and dispatch commands, interpret the acknowledgment, and monitor execution outcomes.
+
+## Command Structure
+
+Every command you send to a payload is a JSON object with three fields: a `type` that identifies the operation, an optional `parameters` object containing operation-specific arguments, and an optional `priority` integer that influences execution ordering when the payload queue contains multiple pending commands.
+
+Command types are defined by the payload's registered capabilities. Common examples include `START_CAPTURE`, `STOP`, `SET_FREQUENCY`, and `RUN_DIAGNOSTIC`. Refer to the documentation for your specific payload type for the full list of supported command types and their parameter schemas.
+
+## Steps
+
+<Steps>
+  <Step title="Identify the payload ID">
+    You need the unique `id` of the payload you want to command. If you have it from registration, you can use it directly. If not, retrieve it by listing your registered payloads and filtering by name.
+
+    ```bash
+    curl https://api.volleyosa.dev/v1/payloads \
+      -H "Authorization: Bearer YOUR_API_KEY"
+    ```
+
+    The `id` field in each returned object is what you will use in the next step.
+  </Step>
+
+  <Step title="Construct the command payload">
+    Build the JSON command object. Set the `type` to the operation you want the payload to perform, populate `parameters` with any operation-specific arguments, and optionally set a `priority` if the command needs to pre-empt lower-priority queued work.
+
+    ```json
+    {
+      "type": "START_CAPTURE",
+      "parameters": {
+        "duration_seconds": 30,
+        "resolution": "high"
+      },
+      "priority": 7
+    }
+    ```
+  </Step>
+
+  <Step title="POST to /payloads/{id}/commands">
+    Submit the command to the endpoint, replacing `{id}` with your payload's identifier.
+
+    **cURL**
+
+    ```bash
+    curl -X POST https://api.volleyosa.dev/v1/payloads/pl_7f3a9c2b/commands \
+      -H "Authorization: Bearer YOUR_API_KEY" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "type": "START_CAPTURE",
+        "parameters": {
+          "duration_seconds": 30,
+          "resolution": "high"
+        },
+        "priority": 7
+      }'
+    ```
+
+    **Python**
+
+    ```python
+    import requests
+
+    payload_id = "pl_7f3a9c2b"
+    headers = {
+        "Authorization": "Bearer YOUR_API_KEY",
+        "Content-Type": "application/json",
+    }
+
+    command = {
+        "type": "START_CAPTURE",
+        "parameters": {
+            "duration_seconds": 30,
+            "resolution": "high",
+        },
+        "priority": 7,
+    }
+
+    response = requests.post(
+        f"https://api.volleyosa.dev/v1/payloads/{payload_id}/commands",
+        json=command,
+        headers=headers,
+    )
+    print(response.json())
+    ```
+  </Step>
+
+  <Step title="Handle the synchronous acknowledgment">
+    A successfully received command returns `202 Accepted` with an acknowledgment object. This confirms the platform has validated and queued the command — it does **not** mean the command has finished executing.
+
+    ```json
+    {
+      "command_id": "cmd_4a1b8e3f",
+      "payload_id": "pl_7f3a9c2b",
+      "type": "START_CAPTURE",
+      "status": "acknowledged",
+      "priority": 7,
+      "accepted_at": "2024-11-14T11:05:22Z"
+    }
+    ```
+
+    Store the `command_id` — you will use it to correlate execution result events on the AsyncAPI channel.
+  </Step>
+
+  <Step title="Monitor async execution via payload.events">
+    After acknowledgment, the payload executes the command asynchronously. Subscribe to the `payload.events` AsyncAPI channel to receive the outcome. Filter incoming events by `command_id` to isolate the result of the specific command you dispatched. See the [Receive Events guide](/guides/receiving-events) for subscription details.
+  </Step>
+</Steps>
+
+## Request Schema
+
+<ParamField body="type" type="string" required>
+  The command type identifier. This is a string constant that maps to a specific operation the payload supports. Examples include `START_CAPTURE`, `STOP`, `SET_FREQUENCY`, and `RUN_DIAGNOSTIC`. The set of valid types depends on the target payload's registered capabilities.
+</ParamField>
+
+<ParamField body="parameters" type="object">
+  An optional object containing command-specific arguments. The shape of this object varies by command type. For example, `START_CAPTURE` accepts `duration_seconds` and `resolution`, while `SET_FREQUENCY` accepts `frequency_mhz`. Refer to your payload type's command reference for valid parameter keys.
+</ParamField>
+
+<ParamField body="priority" type="integer">
+  An optional integer from `1` (lowest) to `10` (highest) that controls execution ordering when multiple commands are queued for the same payload. Defaults to `5` if omitted. Higher-priority commands are dequeued before lower-priority ones. Use elevated priorities (`8`–`10`) sparingly and only for time-sensitive operations such as emergency stops.
+</ParamField>
+
+## Response
+
+The `202 Accepted` acknowledgment response confirms the command has been received, validated, and queued.
+
+```json
+{
+  "command_id": "cmd_4a1b8e3f",
+  "payload_id": "pl_7f3a9c2b",
+  "type": "START_CAPTURE",
+  "status": "acknowledged",
+  "priority": 7,
+  "accepted_at": "2024-11-14T11:05:22Z"
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `command_id` | string | Platform-assigned unique identifier for this command instance. |
+| `payload_id` | string | The ID of the payload the command was dispatched to. |
+| `type` | string | The command type as submitted. |
+| `status` | string | Always `acknowledged` in the synchronous response. Execution status updates arrive on `payload.events`. |
+| `priority` | integer | The effective priority at which the command was queued. |
+| `accepted_at` | string | ISO 8601 timestamp when the platform accepted the command. |
+
+## Command Execution Flow
+
+The VOLLEY OSA command lifecycle has two distinct phases that map to different API surfaces.
+
+**Phase 1 — Synchronous acknowledgment:** `POST /payloads/{id}/commands` validates the command, assigns it a `command_id`, places it in the payload's execution queue, and immediately returns `202 Accepted`. This phase is always synchronous and completes within the lifetime of the HTTP request.
+
+**Phase 2 — Asynchronous execution:** The platform dequeues the command according to its priority and delivers it to the payload. As the payload executes, it emits lifecycle events (`command_started`, `command_completed`, `command_failed`) on the `payload.events` AsyncAPI channel. Your integration should subscribe to this channel and correlate events using the `command_id` received in Phase 1.
+
+This design keeps your HTTP client unblocked regardless of how long the payload operation takes to complete.
+
+<Note>
+Execution results — including success confirmations, output data references, and failure reasons — arrive exclusively on the `payload.events` AsyncAPI channel. The REST API does not provide a polling endpoint for individual command execution status. Subscribe to the channel before dispatching commands to avoid missing early events.
+</Note>

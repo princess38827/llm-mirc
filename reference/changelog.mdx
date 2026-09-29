@@ -1,0 +1,39 @@
+---
+title: "VOLLEY OSA Changelog"
+sidebarTitle: "Changelog"
+description: "Release history for VOLLEY OSA — interface changes, additions, and deprecations across all versions of the ICD."
+---
+
+This page tracks interface changes, additions, and deprecations across all versions of the VOLLEY OSA ICD. Each entry describes what changed, what was added, and — where applicable — what was deprecated or removed. Consult this page whenever you upgrade your integration to understand what may have shifted between versions.
+
+---
+
+### v0.1.0 — Initial Release
+
+The following interfaces and capabilities were introduced in the initial concept-seed release of VOLLEY OSA:
+
+- **REST API:** `POST /payloads` — register a new non-kinetic payload with the VOLLEY platform
+- **REST API:** `GET /payloads` — list all payloads associated with your API key
+- **REST API:** `GET /payloads/{id}` — retrieve the full record for a single payload by identifier
+- **REST API:** `POST /payloads/{id}/commands` — dispatch a command to a registered payload
+- **REST API:** `GET /payloads/{id}/status` — poll the current operational status of a payload
+- **AsyncAPI:** `payload.telemetry` channel — subscribe to continuous sensor and telemetry data streams from a payload
+- **AsyncAPI:** `payload.events` channel — subscribe to discrete lifecycle and state-change notifications emitted by a payload
+- **Authentication:** API key Bearer token scheme — all requests must include a valid `Authorization: Bearer <api-key>` header
+- **Payload types:** the following type classifications are supported at registration: `electro-optical`, `rf`, `cyber`, `acoustic`, `other`
+
+<Note>
+  This is a concept-seed release. The VOLLEY OSA interface has not yet undergone formal MOSA certification and is subject to change — including breaking changes — in future versions. Do not rely on v0.1.0 for production or program-of-record integrations without explicit coordination with the VOLLEY platform team.
+</Note>
+
+---
+
+### Versioning Policy
+
+VOLLEY OSA follows **semantic versioning** (`MAJOR.MINOR.PATCH`):
+
+- **Major version** increments signal breaking changes — removals, renamed fields, altered request/response schemas, or incompatible authentication changes. You should expect to update your integration before upgrading across a major boundary.
+- **Minor version** increments signal additive, backward-compatible changes — new endpoints, new optional fields, new channel topics, or expanded enum values. Existing integrations should continue to function without modification.
+- **Patch version** increments cover non-breaking fixes such as documentation corrections, clarified descriptions, or typo remediation in field names that were not yet in active use.
+
+When a deprecation is planned, it will be noted in the changelog entry for the version that introduces the deprecation notice, along with the target version at which the deprecated element will be removed.

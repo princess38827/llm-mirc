@@ -1,0 +1,148 @@
+---
+title: "Core Concepts: VOLLEY OSA Terminology and Data Model"
+sidebarTitle: "Core Concepts"
+description: "Understand the key terms, data model, and architectural patterns used throughout the VOLLEY OSA interface — payloads, commands, telemetry, and events."
+---
+
+Before you write a single line of integration code, it pays to understand the vocabulary and data model that VOLLEY OSA uses throughout its REST and async interfaces. Every field name, status value, and channel name in this ICD maps to a concept defined here. Misunderstanding these fundamentals is the most common source of integration errors, so take a few minutes to read through this page before diving into endpoint references or code examples.
+
+## Payloads
+
+A **payload** is any non-kinetic module that you register with the VOLLEY platform so that VOLLEY can command, monitor, and coordinate it. Payloads represent physical or logical systems — electro-optical sensors, signals intelligence packages, electronic warfare modules, and similar — that operate under VOLLEY's direction but are developed and maintained independently.
+
+When you register a payload via `POST /payloads`, VOLLEY assigns it a unique `id` (for example, `pl_7f3a9c2b`) and tracks it through its operational lifecycle.
+
+### Payload Lifecycle
+
+A payload moves through four well-defined states. You can read the current state from the `status` field returned by `GET /payloads/{id}` and `GET /payloads/{id}/status`.
+
+```
+registered → active → inactive → deregistered
+```
+
+| State | Description |
+|---|---|
+| `registered` | The payload record exists in VOLLEY. The payload is known but not yet operationally connected. |
+| `active` | The payload is connected and responding to commands. Telemetry and events are flowing. |
+| `inactive` | The payload was previously active but is no longer reachable or has been explicitly suspended. |
+| `deregistered` | The payload has been removed from VOLLEY. Its record is retained for audit purposes but it can no longer receive commands. |
+
+Transitions between states are triggered by connectivity events, explicit commands, and administrative actions. The `payload.events` channel publishes a notification each time a state transition occurs.
+
+## Commands
+
+A **command** is a typed instruction that you dispatch to a registered payload through `POST /payloads/{id}/commands`. Commands tell the payload to perform a specific action — capturing an image, adjusting a configuration parameter, initiating a scan — depending on the capabilities the payload declared at registration.
+
+### Acknowledgment and Execution
+
+VOLLEY OSA separates command acknowledgment from command execution:
+
+- **Acknowledgment** is synchronous. When you `POST` a command, the platform validates the request and returns a command record with `"status": "acknowledged"` immediately, before the payload has acted on it.
+- **Execution** is asynchronous. The payload receives the command over its control channel and carries out the action in its own execution context. Completion or failure is surfaced through the `payload.events` channel rather than the original HTTP response.
+
+This separation means your integration never blocks waiting for a payload to finish a potentially long-running operation. Subscribe to `payload.events` to track command outcomes in real time.
+
+### Command Record Fields
+
+```json
+{
+  "command_id": "cmd_4d1e82fa",
+  "payload_id": "pl_7f3a9c2b",
+  "command": "capture_image",
+  "parameters": {
+    "resolution": "high",
+    "format": "jpeg"
+  },
+  "status": "acknowledged",
+  "issued_at": "2024-01-15T10:31:05Z"
+}
+```
+
+The `command` field is a string identifier that must match one of the capability tokens the payload declared in its `capabilities` array at registration.
+
+## Status
+
+A payload's **status** is the platform's current or last-known view of the payload's operational state. You retrieve it with `GET /payloads/{id}/status`.
+
+Status combines two concerns:
+
+- **Lifecycle state** (`status` field) — where the payload sits in the `registered → active → inactive → deregistered` lifecycle, as described above.
+- **Health indicators** (`health` field) — a qualitative assessment of the payload's internal condition: `nominal`, `degraded`, or `fault`.
+
+```json
+{
+  "payload_id": "pl_7f3a9c2b",
+  "status": "active",
+  "last_seen": "2024-01-15T10:31:10Z",
+  "health": "nominal",
+  "active_command": "cmd_4d1e82fa"
+}
+```
+
+The `last_seen` timestamp reflects the most recent moment the platform received any communication from the payload. If a payload becomes unreachable, `last_seen` will stop advancing and the lifecycle state will eventually transition to `inactive`.
+
+## Telemetry
+
+**Telemetry** is the continuous stream of sensor readings and operational metrics that an active payload emits during normal operation. Telemetry data flows over the `payload.telemetry` AsyncAPI channel rather than through the REST API, because its volume and frequency are unsuitable for polling.
+
+Telemetry messages are keyed by `payload_id` and carry a `data` object whose schema depends on the payload type and the capabilities it declared at registration. An electro-optical sensor might emit frame metadata and pointing angles; a signals intelligence package might emit frequency coverage and scan statistics.
+
+```json
+{
+  "payload_id": "pl_7f3a9c2b",
+  "timestamp": "2024-01-15T10:31:12.450Z",
+  "data": {
+    "sensor": "EO-1",
+    "frame_id": 1042,
+    "azimuth_deg": 134.7,
+    "elevation_deg": 22.3,
+    "zoom_level": 4
+  }
+}
+```
+
+Your integration subscribes to `payload.telemetry` and filters by `payload_id` to receive data for the specific payloads you care about.
+
+## Events
+
+**Events** are discrete, point-in-time notifications that VOLLEY publishes on the `payload.events` AsyncAPI channel whenever something meaningful changes in the platform's view of a payload. Unlike telemetry — which is a high-frequency, continuous stream — events are sparse and carry semantic meaning.
+
+Examples of events include:
+
+- A payload transitioning from `registered` to `active` after establishing its control channel connection.
+- A command completing successfully or failing.
+- A payload's health status degrading from `nominal` to `degraded`.
+- A payload being administratively deregistered.
+
+```json
+{
+  "event_id": "evt_9b2c4a11",
+  "payload_id": "pl_7f3a9c2b",
+  "event_type": "status_changed",
+  "previous_status": "registered",
+  "current_status": "active",
+  "timestamp": "2024-01-15T10:30:45Z"
+}
+```
+
+Subscribe to `payload.events` to build reactive integrations that respond to state changes without polling the REST API.
+
+<Note>
+  **Telemetry vs. Events** — these two channels serve different purposes and should not be confused. **Telemetry** (`payload.telemetry`) carries high-frequency, continuous sensor and operational data — it tells you *what the payload is measuring* right now. **Events** (`payload.events`) carry sparse, discrete notifications — they tell you *what changed* about the payload's state. Use telemetry for data ingestion pipelines and situational displays; use events for control logic, alerting, and audit trails.
+</Note>
+
+## Versioning
+
+All VOLLEY OSA REST endpoints are prefixed with an API version segment. The current version is `/v1`:
+
+```
+https://api.volleyosa.dev/v1/payloads
+```
+
+VOLLEY OSA follows these versioning conventions:
+
+- **Non-breaking changes** — adding optional fields to responses, adding new endpoints, or relaxing validation constraints — are made within the current version without a version increment.
+- **Breaking changes** — removing fields, changing field types, altering required request parameters, or changing authentication schemes — will increment the version to `/v2`, and so on.
+- **Deprecation notices** — before a version is retired, a deprecation period will be announced with a specific sunset date. The `Deprecation` and `Sunset` HTTP response headers will be present on deprecated endpoints.
+
+Always pin your client to an explicit version prefix and monitor the changelog for deprecation notices before upgrading.

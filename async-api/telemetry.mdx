@@ -1,0 +1,160 @@
+---
+title: "AsyncAPI payload.telemetry Channel Reference"
+sidebarTitle: "Telemetry"
+description: "Message schema for the VOLLEY OSA payload.telemetry AsyncAPI channel — continuous sensor data and metrics streamed from active payloads."
+---
+
+The `payload.telemetry` channel provides a continuous stream of sensor and operational data from active payload modules. Unlike the events channel — which fires only when something notable happens — telemetry messages arrive at a regular cadence for every payload currently in the `active` state. Use this channel when you need live situational awareness: position tracking, sensor health monitoring, or feeding data into a real-time display or analytics pipeline.
+
+## Channel
+
+| Property | Value |
+|----------|-------|
+| Channel name | `payload.telemetry` |
+| Transports | WebSocket, AMQP |
+| Message format | JSON |
+| Direction | Server → Client (subscribe only) |
+
+## When Telemetry Is Emitted
+
+Payloads in the `active` state emit telemetry on a configurable interval with a default rate of **1 Hz** (one message per second). The emission interval is set at payload registration and can be adjusted through the REST API. Payloads in any other state — `initializing`, `standby`, `error`, or `deregistered` — do not emit telemetry messages. You will not receive a final message when a payload leaves the `active` state; instead, subscribe to [`payload.events`](/async-api/events) to detect `status_changed` transitions.
+
+To filter the stream to a single payload, append a `payload_id` query parameter to the connection URL:
+
+```
+wss://async.volleyosa.dev/v1/payload.telemetry?payload_id=pl_7f3a9c2b
+```
+
+## Message Schema
+
+Every message on the `payload.telemetry` channel shares the following top-level structure. The `data` field contains sensor readings whose schema depends on the payload type — see [Telemetry Data by Payload Type](#telemetry-data-by-payload-type) below.
+
+<ResponseField name="payload_id" type="string" required>
+  The unique identifier of the payload that produced this telemetry frame, e.g. `pl_7f3a9c2b`.
+</ResponseField>
+
+<ResponseField name="timestamp" type="string" required>
+  ISO 8601 UTC timestamp recording when the telemetry frame was sampled on the payload, e.g. `2024-01-15T12:05:30.000Z`.
+</ResponseField>
+
+<ResponseField name="sequence" type="integer" required>
+  A monotonically increasing integer that increments by one with each frame emitted by this payload. Use the sequence number to detect dropped or out-of-order messages in your consumer. The counter resets to `0` when the payload transitions to `active` after a restart.
+</ResponseField>
+
+<ResponseField name="data" type="object" required>
+  Payload-type-specific sensor readings. The schema of this object varies by payload type. See [Telemetry Data by Payload Type](#telemetry-data-by-payload-type) for schemas and examples.
+</ResponseField>
+
+<ResponseField name="quality" type="number" required>
+  A data quality indicator in the range `0.0` (unusable) to `1.0` (perfect). Values below `0.5` indicate that sensor degradation or environmental conditions are significantly affecting the data. Consider alerting or falling back to backup sensors when `quality` drops below your acceptable threshold.
+</ResponseField>
+
+## Telemetry Data by Payload Type
+
+The `data` field schema is determined by the `type` property set at payload registration. The schemas below describe the fields you can expect for each supported payload type.
+
+### Electro-Optical (`electro-optical`)
+
+Electro-optical payloads report imaging parameters and the geodetic coordinates of the current field of view.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `frame_rate` | integer | Current capture rate in frames per second |
+| `resolution` | string | Active sensor resolution, e.g. `"1920x1080"` |
+| `fov_degrees` | number | Current field-of-view angle in degrees |
+| `coordinates.lat` | number | Latitude of the field-of-view center in decimal degrees |
+| `coordinates.lon` | number | Longitude of the field-of-view center in decimal degrees |
+| `coordinates.alt` | number | Altitude of the field-of-view center in meters above sea level |
+
+**Full message example:**
+
+```json
+{
+  "payload_id": "pl_7f3a9c2b",
+  "timestamp": "2024-01-15T12:05:30.000Z",
+  "sequence": 1842,
+  "data": {
+    "frame_rate": 30,
+    "resolution": "1920x1080",
+    "fov_degrees": 45.0,
+    "coordinates": {
+      "lat": 36.1699,
+      "lon": -115.1398,
+      "alt": 1200.0
+    }
+  },
+  "quality": 0.98
+}
+```
+
+---
+
+### RF (`rf`)
+
+RF payloads report spectrum monitoring data including the observed frequency, received power level, and bearing to the signal source.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `frequency_hz` | number | Center frequency being monitored in hertz |
+| `power_dbm` | number | Received signal power in dBm |
+| `bearing_degrees` | number | Bearing to the signal source in degrees true north (0–360) |
+
+**Full message example:**
+
+```json
+{
+  "payload_id": "pl_4e8d1a7f",
+  "timestamp": "2024-01-15T12:05:30.000Z",
+  "sequence": 512,
+  "data": {
+    "frequency_hz": 2437000000,
+    "power_dbm": -68.5,
+    "bearing_degrees": 274.3
+  },
+  "quality": 0.91
+}
+```
+
+---
+
+### Cyber (`cyber`)
+
+Cyber payloads report network traffic metrics observed by the payload's monitoring interface.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `packets_per_second` | number | Current inbound + outbound packet rate |
+| `bytes_per_second` | number | Current inbound + outbound throughput in bytes per second |
+| `active_connections` | integer | Number of currently tracked network connections |
+
+**Full message example:**
+
+```json
+{
+  "payload_id": "pl_9c2f5b3e",
+  "timestamp": "2024-01-15T12:05:30.000Z",
+  "sequence": 97,
+  "data": {
+    "packets_per_second": 14823.6,
+    "bytes_per_second": 2097152,
+    "active_connections": 348
+  },
+  "quality": 1.0
+}
+```
+
+---
+
+## Backpressure
+
+The VOLLEY OSA telemetry server applies a **sliding window** buffer per connection. If your consumer falls behind — for example, because message processing is blocking the read loop — the server will begin dropping the oldest buffered messages to make room for new ones. Your consumer will not receive an explicit notification when messages are dropped; use the `sequence` field to detect gaps.
+
+To avoid message loss:
+
+- Process each message as quickly as possible and offload heavy work (database writes, ML inference, rendering) to a separate thread or queue.
+- Increase your consumer's read buffer size if your transport client supports it.
+- If you do not need real-time fidelity, use the [REST status endpoint](/api-reference/status) to poll for current state instead of subscribing to the telemetry channel.
+
+<Tip>
+  Compare the `sequence` number of each incoming frame against the previous frame for the same `payload_id`. A gap greater than 1 means one or more frames were dropped. Log the gap size so you can tune your buffer and processing latency over time. On WebSocket, you can also send a `ping` frame periodically to verify the connection is still alive before a gap occurs.
+</Tip>

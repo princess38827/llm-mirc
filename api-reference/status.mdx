@@ -1,0 +1,112 @@
+---
+title: "REST API Endpoint for Payload Status"
+sidebarTitle: "Status"
+description: "Reference for GET /payloads/{id}/status — retrieve the current operational status and health of a registered VOLLEY OSA payload."
+---
+
+The status endpoint gives you a real-time snapshot of a payload's operational condition: whether it is online, how long it has been running, and detailed health metrics such as CPU load, memory pressure, and accumulated error count. This is the right endpoint to call when you need an immediate, point-in-time picture of a payload's health — for example, before dispatching a high-priority command or when triaging an alert. For continuous, event-driven monitoring, consider subscribing to the `payload.events` AsyncAPI channel instead of polling this endpoint repeatedly.
+
+---
+
+### GET /payloads/{id}/status
+
+Retrieve the current operational status and health metrics for a single registered payload.
+
+**Endpoint**
+
+```
+GET https://api.volleyosa.dev/v1/payloads/{id}/status
+```
+
+#### Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the payload whose status you want to retrieve (e.g., `pl_7f3a9c2b`).
+</ParamField>
+
+#### Response Fields
+
+<ResponseField name="payload_id" type="string">
+  The unique identifier of the payload. Mirrors the `{id}` path parameter.
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  The current lifecycle status of the payload. One of: `registered`, `active`, `inactive`, `error`, or `deregistered`. See [Status Values](#status-values) for detailed descriptions of each state.
+</ResponseField>
+
+<ResponseField name="last_seen" type="string">
+  ISO 8601 timestamp of the most recent heartbeat or communication received from the payload. A stale `last_seen` value — particularly in combination with a non-`active` status — may indicate a connectivity issue.
+</ResponseField>
+
+<ResponseField name="uptime_seconds" type="integer">
+  The number of continuous seconds the payload has been operational since its last start or reboot. Returns `0` if the payload has not yet reported uptime.
+</ResponseField>
+
+<ResponseField name="health" type="object">
+  A nested object containing real-time resource and error metrics reported by the payload. See [Health Object](#health-object) for full field descriptions.
+
+  <Expandable title="health object fields">
+    <ResponseField name="cpu_percent" type="number">
+      Current CPU utilization of the payload module, expressed as a percentage (`0.0`–`100.0`).
+    </ResponseField>
+    <ResponseField name="memory_percent" type="number">
+      Current memory utilization of the payload module, expressed as a percentage (`0.0`–`100.0`).
+    </ResponseField>
+    <ResponseField name="error_count" type="integer">
+      Cumulative number of errors reported by the payload since its last start or reboot. A rising `error_count` without a change in `status` may indicate degraded but still-operational conditions worth investigating.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+#### Example Request
+
+```bash
+curl -X GET https://api.volleyosa.dev/v1/payloads/pl_7f3a9c2b/status \
+  -H "Authorization: Bearer YOUR_API_KEY"
+```
+
+#### Example Response
+
+```json
+{
+  "payload_id": "pl_7f3a9c2b",
+  "status": "active",
+  "last_seen": "2024-01-15T12:05:30Z",
+  "uptime_seconds": 86400,
+  "health": {
+    "cpu_percent": 34.2,
+    "memory_percent": 61.8,
+    "error_count": 3
+  }
+}
+```
+
+---
+
+## Status Values
+
+The `status` field reflects the payload's position in its operational lifecycle. The table below describes what each value means and what action — if any — is appropriate.
+
+| Status | Description | Recommended Action |
+|---|---|---|
+| `registered` | The payload has been registered via the API but the VOLLEY platform has not yet received a live connection from the module. | Wait for the payload module to connect; it will transition to `active` automatically. |
+| `active` | The payload is online, connected to the VOLLEY platform, and ready to receive commands. | Normal operation — commands can be dispatched. |
+| `inactive` | The payload is registered but is not currently connected or is in a standby state. | Send a `WAKE` command or check payload power and connectivity. |
+| `error` | The payload has reported a fault condition or the platform has lost contact unexpectedly. | Inspect `health.error_count` and recent events; attempt a `REBOOT` command if appropriate. |
+| `deregistered` | The payload has been removed from the platform via the DELETE endpoint. | Re-register the payload if it should be restored to service. |
+
+---
+
+## Health Object
+
+The `health` object provides a snapshot of the payload module's resource consumption and error state at the time the request was made. These values are reported directly by the payload and reflect conditions on the module itself — not on the VOLLEY platform infrastructure.
+
+| Field | Type | Description |
+|---|---|---|
+| `cpu_percent` | `number` | CPU utilization as a percentage. Values consistently above `85.0` may indicate the payload is under excessive load. |
+| `memory_percent` | `number` | Memory utilization as a percentage. Values above `90.0` risk out-of-memory conditions on constrained hardware. |
+| `error_count` | `integer` | Cumulative error count since last start. This counter does not reset until the payload reboots. Compare values across successive polls to determine the error rate. |
+
+<Tip>
+  When polling this endpoint to monitor payload health, limit your polling frequency to **at most once per second**. Polling more frequently than this provides minimal additional signal while consuming rate limit quota faster. For real-time, push-based monitoring without polling overhead, subscribe to the `payload.events` channel defined in the VOLLEY OSA AsyncAPI specification — it delivers status transitions and health alerts the moment they occur.
+</Tip>

@@ -1,20 +1,39 @@
 ---
-title: "Introduction"
-description: "Welcome to your project"
+title: "VOLLEY OSA: Open Systems Architecture for Payload Integration"
+sidebarTitle: "Home"
+description: "VOLLEY OSA defines the REST and async interfaces for integrating non-kinetic payloads into the VOLLEY platform — modular, open, and UNCLASSIFIED."
 ---
 
-Write a short description of your product here. What it does, who it's for, and what they can accomplish with it.
+Welcome to the VOLLEY OSA (Open Systems Architecture) documentation. VOLLEY OSA v0.1 is a MOSA-aligned Interface Control Document (ICD) that specifies the REST and asynchronous API interfaces you need to integrate non-kinetic payload modules into the VOLLEY platform. Whether you are registering a new payload, dispatching commands, or consuming real-time telemetry streams, these docs give you everything required to build a compliant, interoperable integration from day one.
 
-<Tip>
-  Ready to make this your own? Start by editing this page. Update your `docs.json` file to customize your site. Then fill out the [Quickstart](/quickstart) page.
-</Tip>
+<CardGroup cols={2}>
+  <Card title="Introduction" icon="book-open" href="/introduction">
+    Learn what VOLLEY OSA is and who it's for
+  </Card>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Make your first API call in minutes
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference/overview">
+    Full REST and Async API documentation
+  </Card>
+  <Card title="Integration Guides" icon="plug" href="/guides/authentication">
+    Step-by-step payload integration walkthroughs
+  </Card>
+</CardGroup>
 
-<Card title="Quickstart" icon="rocket" href="/quickstart">
-  This card links to the quickstart page in your project.
-</Card>
-<Card title="Components" icon="puzzle-piece" href="https://mintlify.com/docs/components">
-  Add cards, callouts, steps, tabs, and more to design and structure your pages.
-</Card>
-<Card title="Settings" icon="gear" href="https://mintlify.com/docs/organize/settings">
-  Set your site name, branding, and navigation in the `docs.json` file.
-</Card>
+## Get Up and Running
+
+<Steps>
+  <Step title="Obtain API Credentials">
+    Request access and receive your API key from the VOLLEY OSA platform.
+  </Step>
+  <Step title="Register Your Payload">
+    Use POST /payloads to register your payload module and receive a payload ID.
+  </Step>
+  <Step title="Send Commands">
+    Dispatch commands to your payload using POST /payloads/{id}/commands.
+  </Step>
+  <Step title="Stream Telemetry">
+    Subscribe to the payload.telemetry AsyncAPI channel for real-time data.
+  </Step>
+</Steps>

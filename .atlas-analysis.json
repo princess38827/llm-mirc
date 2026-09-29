@@ -1,30 +1,11 @@
 {
-  "$schema": "https://mintlify.com/docs.json",
+  "projectType": "api-service",
+  "projectName": "VOLLEY OSA",
+  "projectDescription": "VOLLEY Open Systems Architecture (OSA) 0.1 — an interface control document defining REST and async APIs for integrating non-kinetic payloads into the VOLLEY platform.",
   "theme": "luma",
-  "name": "VOLLEY OSA",
-  "colors": {
-    "primary": "#ef7025",
-    "light": "#eec9bc",
-    "dark": "#4fa1ab"
-  },
-  "favicon": "/favicon.svg",
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:support@volleyosa.dev"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Get API Access",
-      "href": "https://volleyosa.dev"
-    }
-  },
+  "primaryColor": "#ef7025",
+  "lightColor": "#eec9bc",
+  "darkColor": "#4fa1ab",
   "navigation": {
     "tabs": [
       {
@@ -89,7 +70,20 @@
       }
     ]
   },
-  "footer": {
-    "socials": {}
-  }
+  "keyFeatures": [
+    "OpenAPI-defined REST interface for payload registration and command dispatch",
+    "AsyncAPI-defined event streaming for real-time telemetry and status updates",
+    "Open Systems Architecture (OSA) enabling modular, interchangeable payload integration",
+    "Non-kinetic payload support with UNCLASSIFIED interface definitions",
+    "Concept-level MOSA-aligned ICD for rapid prototyping and integration"
+  ],
+  "publicApiSurface": [
+    "GET /payloads — list registered payloads",
+    "POST /payloads — register a new payload",
+    "GET /payloads/{id} — retrieve payload details",
+    "POST /payloads/{id}/commands — send a command to a payload",
+    "GET /payloads/{id}/status — query payload status",
+    "AsyncAPI channel: payload.telemetry — real-time telemetry stream",
+    "AsyncAPI channel: payload.events — lifecycle and status events"
+  ]
 }
